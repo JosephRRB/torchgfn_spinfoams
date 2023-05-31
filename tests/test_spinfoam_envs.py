@@ -157,3 +157,25 @@ def test_calculated_star_model_rewards_are_correct():
         log_rewards[1], expected_reward_1
     )
 
+
+def test_bug():
+    import torch
+
+    from src.spinfoam.trainer import train_gfn
+
+    torch.manual_seed(0)
+
+    losses = train_gfn(
+        spin_j=0.5,
+        sf_model="single_vertex_model",
+        generated_data_dir=None,
+        hidden_dim=256,
+        n_hidden_layers=2,
+        activation_fn="relu",
+        exploration_rate=0.5,
+        learning_rate=0.0005,
+        batch_size=int(1e5),
+        n_iterations=int(1e4),
+        evaluation_batch_size=int(10),
+        generate_samples_every_m_training_samples=int(1e8),
+    )

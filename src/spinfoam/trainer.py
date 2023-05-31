@@ -74,6 +74,7 @@ def train_gfn(
     params = [
         {
             "params": [
+                # val for key, val in parametrization.parameters.items() if "logZ" not in key
                 val for key, val in parametrization.parameters.items() if ("PF" in key) or ("PB_last" in key)
             ],
             "lr": learning_rate,
