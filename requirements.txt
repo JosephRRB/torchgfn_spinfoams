@@ -1,1 +1,1 @@
-gfn @ git+https://github.com/saleml/torchgfn@master
+torchgfn @ git+https://github.com/saleml/torchgfn@fixsampling
