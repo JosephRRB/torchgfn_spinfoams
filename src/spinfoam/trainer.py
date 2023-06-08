@@ -114,6 +114,7 @@ def train_gfn(
                 samples_file,
                 eval_trajectories.last_states.states_tensor.numpy(),
                 delimiter=",",
+                fmt="%i",
             )
         losses.append(loss.item())
     return losses
