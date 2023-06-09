@@ -169,15 +169,13 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
             
             acceptancePercentage = acceptanceRatio * 100/ batchSize
 
-            print(acceptancePercentage,"of proposed draws have beem accepted in this batch (in master chain).")
+            #print(acceptancePercentage,"of proposed draws have beem accepted in this batch (in master chain).")
 
             batchCounter += 1
 
             # Create file and layout.
             if(not os.path.exists(str(drawsFolder)+"/draws_batch_n_"+str(batchCounter)+".csv")):
                 os.makedirs(str(drawsFolder), exist_ok=True)   
-
-            print(draws)       
             
             
             dfCurrentBatch = pd.DataFrame(draws, columns=[ "dimension 1",
@@ -203,7 +201,6 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
                 dfAllBatches = pd.DataFrame(allBatchesStatistics, columns=[ "acceptance rate (%)", "run time (s)"])
                 # Write them to csv. 
                 dfAllBatches.to_csv(str(drawsFolder)+"/statistics_batches.csv", index=False, mode='w', header=True)
-                print("Done!")
 
 
         RWMonitor = True
