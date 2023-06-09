@@ -149,7 +149,9 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
 
     draws = np.empty( shape=(1,dimensions + 1))
 
-    for n in range(1, iterationsNumber):
+    allBatchesStatistics = np.zeros(shape=(1,2))
+
+    for n in range(1, iterationsNumber+1):
         if(verbosity > 1):
             print("Iteration ", n, "---------------------------------------------------------------")
 
@@ -189,22 +191,19 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
             
             timeFinal = time.time_ns()
 
+            allBatchesStatistics = np.append(allBatchesStatistics, [[acceptancePercentage,  round((timeFinal - timeInitial * 10**(-9) ), ndigits=4)]], axis=0)
+
             acceptanceRatio = 0
             multiplicity = 1
 
             draws = np.zeros(shape=(1,dimensions + 1 ), dtype=np.int64)
 
-            allBatchesStatistics = np.zeros(shape=(1,2))
-
-            allBatchesStatistics = np.append(allBatchesStatistics, [[acceptancePercentage,  round((timeFinal - timeInitial * 10**(-9) ), ndigits=4)]], axis=0)
-
             if(n == iterationsNumber):
-                # Create file for data of all batches.
-                if(not os.path.exists(str(drawsFolder)+"/statistics_batches.csv")):
-                    # Add batches' attributes to dataframe.
-                    dfAllBatches = pd.DataFrame(draws, columns=[ "acceptance rate (%)", "run time (s)"])
-                    # Write them to csv. 
-                    dfAllBatches.to_csv(str(drawsFolder)+"/statistics_batches.csv", index=False, mode='w', header=True)
+                 # Add batches' attributes to dataframe.
+                dfAllBatches = pd.DataFrame(allBatchesStatistics, columns=[ "acceptance rate (%)", "run time (s)"])
+                # Write them to csv. 
+                dfAllBatches.to_csv(str(drawsFolder)+"/statistics_batches.csv", index=False, mode='w', header=True)
+                print("Done!")
 
 
         RWMonitor = True
