@@ -149,7 +149,7 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
 
     draws = np.empty( shape=(1,dimensions + 1))
 
-    allBatchesStatistics = np.zeros(shape=(1,2))
+    allBatchesStatistics = np.zeros(shape=(0,2))
 
     for n in range(1, iterationsNumber+1):
         if(verbosity > 1):
@@ -178,8 +178,8 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
                 os.makedirs(str(drawsFolder), exist_ok=True)   
             
             
-            dfCurrentBatch = pd.DataFrame(draws, columns=[ "dimension 1",
-                    "dimension 2",
+            dfCurrentBatch = pd.DataFrame(draws, columns=[ "dimension1",
+                    "dimension2",
                     "multiplicity"]
             )
             
@@ -194,7 +194,7 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
             acceptanceRatio = 0
             multiplicity = 1
 
-            draws = np.zeros(shape=(1,dimensions + 1 ), dtype=np.int64)
+            draws = np.zeros(shape=(0,dimensions + 1 ), dtype=np.int64)
 
             if(n == iterationsNumber):
                  # Add batches' attributes to dataframe.
@@ -211,11 +211,13 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
         for i in range(len(gaussianDraw)):
 
             while(True):
-                drawFloatSample = deviation*np.random.randn() + mean
+                drawFloatSample = 2*gridLength
+                while(np.abs(drawFloatSample) >= gridLength):
+                    drawFloatSample = 10*(deviation*np.random.randn() + mean)
                 gaussianDraw[i] = int(round(drawFloatSample))
                 proposedDraw[i] = draw[i] + gaussianDraw[i]
             
-                if(((1 <= proposedDraw[i]) and (proposedDraw[i] < gridLength))):
+                if((1 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) and (proposedDraw[i] > 0)):
                     break
             
             if(gaussianDraw[i] != 0):
