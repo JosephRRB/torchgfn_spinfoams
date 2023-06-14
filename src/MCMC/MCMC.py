@@ -9,6 +9,31 @@ from scipy.stats import truncnorm
 os.chdir(sys.path[0])
 
 def grid_rewards_2d(gridLength=13, r0=0.1, r1=0.5, r2=2.0):
+    """
+    Calculate a 2D grid reward fucntion.
+    
+    Parameters
+    ----------
+
+    gridLength: (float)
+                - The length of the grid.
+    
+    r0: (float)
+                - Height of the valleys searating the peaks.
+
+    r1: (float)
+                - Mid level height near the peaks has height r0 + r1.
+
+    r2: (float)
+                - Height of the peaks.
+                 
+    Return:
+        -------
+    rewards: (array)
+                - A 2D array with the corresponding values of the function in the 2D grid of length gridLength.
+                      
+    """
+
     assert gridLength >= 7
     
     coord_1d_dist_from_center = np.abs(np.arange(gridLength) / (gridLength - 1) - 0.5)
@@ -102,18 +127,14 @@ def discreteNormalDistribution(gridLength, mean=0.0, deviation=1.0):
     return truncatedCoefficients
 
 
-def VertexMCMC(spinJ, iterationsNumber, batchSize, burnFactor, verbosity, drawsFolder, deviation, mean = 0., rewardFunction = grid_rewards_2d, dimensions = 2):
+def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, drawsFolder, deviation, mean = 0., rewardFunction = grid_rewards_2d, dimensions = 2):
 
     """
     Run the MCMC simulation and save results in the corresponding folder. 
     
     Parameters
     ----------
-
-    spinJ: (integer)
-                - The value of the highest spin we consider in the spin network basis.
-                - Used to deduce the gridLength.
-    
+   
     iterationsNumber: (integer)
                 - The number of iterations for the MCMC.
 
@@ -144,9 +165,6 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, burnFactor, verbosity, drawsF
          
     """
 
-    gridLength = 2*np.int64(spinJ) + 1
-
-
     # Make sure number of iterations is an integer multiple of the batch size.
     if(iterationsNumber % batchSize != 0):
         raise ValueError("Number of iterations must be a multiple of batch size.")
@@ -154,9 +172,6 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, burnFactor, verbosity, drawsF
     
     # The truncated coefficients for the discrete gaussian distribution.
     truncatedCoefficients = discreteNormalDistribution(gridLength, 0, deviation)
-
-    if(verbosity > 1):
-        print("Truncated coefficients for j =",spinJ,"are",truncatedCoefficients)
 
     draw = np.zeros(dimensions + 1, dtype=np.int64) # The current draw (state).
     gaussianDraw = np.zeros(dimensions , np.int64) # The guassian deformation to be added in the current draw (state).
