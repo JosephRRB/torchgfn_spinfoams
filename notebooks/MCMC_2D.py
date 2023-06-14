@@ -95,39 +95,79 @@ def discreteNormalDistribution(gridLength, mean=0.0, deviation=1.0):
             # Probability debsity function of a normal distribution.
             var, cdf = cdfNormaDistribution(mean, deviation) # var -> random variable, cdf -> the corresponding value for var
 
-            cdfDifferences += cdf[np.argmax(var > n + 0.5)] + cdf[np.argmax(var > n - 0.5)] # Find the cumulative probability in each point.
+            cdfDifferences += cdf[np.argmax(var > n + 0.5)] - cdf[np.argmax(var > n - 0.5)] # Find the cumulative probability in each point.
 
-        # TODO: Should't the result be something like: (cdfNormaDistribution(i,deviation) - cdfNormaDistribution(i,deviation)) / cdfDifferences?
         truncatedCoefficients[i] = cdfDifferences
         
     return truncatedCoefficients
 
-def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbosity, drawsFolder, mean = 0.):
 
-    dimensions = 2
+def VertexMCMC(spinJ, iterationsNumber, batchSize, burnFactor, verbosity, drawsFolder, deviation, mean = 0., rewardFunction = grid_rewards_2d, dimensions = 2):
+
+    """
+    Run the MCMC simulation and save results in the corresponding folder. 
+    
+    Parameters
+    ----------
+
+    spinJ: (integer)
+                - The value of the highest spin we consider in the spin network basis.
+                - Used to deduce the gridLength.
+    
+    iterationsNumber: (integer)
+                - The number of iterations for the MCMC.
+
+    batchSize: (integer)
+                - The number of iterations per batch.
+
+    burnFactor: (integer)
+                - The number of iterations discarded in each batch due to non-convergence.
+
+    verbosity: (integer)
+                - Whether information should be printed.
+    
+    drawsFolder: (string)
+                - The lcoation of the data folder.
+    
+    deviation: (float)
+                - The standard deviation of our Gaussian distribution.
+
+    mean: (float)
+                - The mean of our Gaussian distribution.
+
+    rewardFunction: (function)
+                - The reward function our MCMC is trying to lean from. 
+                - Should return a 'dimensions' times array where is dimension has gridLength.
+
+    dimensions: (integer)
+                - The number of dimensions.
+         
+    """
 
     gridLength = 2*np.int64(spinJ) + 1
 
 
+    # Make sure number of iterations is an integer multiple of the batch size.
     if(iterationsNumber % batchSize != 0):
         raise ValueError("Number of iterations must be a multiple of batch size.")
     
     
+    # The truncated coefficients for the discrete gaussian distribution.
     truncatedCoefficients = discreteNormalDistribution(gridLength, 0, deviation)
 
     if(verbosity > 1):
         print("Truncated coefficients for j =",spinJ,"are",truncatedCoefficients)
 
-    draw = np.zeros(dimensions + 1, dtype=np.int64)
-    gaussianDraw = np.zeros(dimensions , np.int64)
+    draw = np.zeros(dimensions + 1, dtype=np.int64) # The current draw (state).
+    gaussianDraw = np.zeros(dimensions , np.int64) # The guassian deformation to be added in the current draw (state).
 
-    amplitude = 0.0
+    amplitude = 0.0 # value of the reward function for the current draw.
   
     while( amplitude == 0 ):
         for i in range(np.size(draw)):
-            draw[i] = np.random.randint(gridLength)
+            draw[i] = np.random.randint(gridLength) # Initialize current draw.
         
-        positionProbability = grid_rewards_2d(gridLength=gridLength)
+        positionProbability = rewardFunction(gridLength) 
         amplitude = positionProbability[tuple(draw[:-1])]
         
     draw[-1] = 1 # Initial multiplicity
@@ -135,21 +175,21 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
     if (verbosity > 1):
         print("Initial draw is", draw[:-1],"with amplitude", amplitude)
 
-    # Proposed draw
+    # Proposed draw (to be determinned adding the guassian deformation to the current draw).
     proposedDraw = np.zeros(dimensions , dtype=np.int64)
 
-    acceptanceRatio = 0
-    multiplicity = 1    # initial multiplicity counter
+    acceptanceRatio = 0 # To measure the percentage of accepted moves by the simulator. Estimator of the codes optimization.
+    multiplicity = 1    # Initial multiplicity counter.
     
     RWMonitor = True
 
-    dfAllBatches = pd.DataFrame({"acceptance rate (%)":[], "run time (s)":[]})
+    dfAllBatches = pd.DataFrame({"acceptance rate (%)":[], "run time (s)":[]}) # DataFrame to save universal data for the eah batch.
 
-    batchCounter = 0
+    batchCounter = 0 # Indicator to be used naming each batch.
 
-    draws = np.empty( shape=(1,dimensions + 1))
+    draws = np.empty( shape=(1,dimensions + 1)) # Array to save the states visited in each batch.
 
-    allBatchesStatistics = np.zeros(shape=(0,2))
+    allBatchesStatistics = np.zeros(shape=(0,2)) # Array to keep the changes which will be passed in the dfAllBatches DataFrame.
 
     for n in range(1, iterationsNumber+1):
         if(verbosity > 1):
@@ -181,7 +221,7 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
             dfCurrentBatch = pd.DataFrame(draws, columns=[ "dimension1",
                     "dimension2",
                     "multiplicity"]
-            )
+            ) # DataFrame to save the states visited in the current batch.
             
             # Write new batch to csv.
             dfCurrentBatch.to_csv(str(drawsFolder)+"/draws_batch_n_"+str(batchCounter)+".csv", index=False, mode='w', header=True)
@@ -191,11 +231,13 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
 
             allBatchesStatistics = np.append(allBatchesStatistics, [[acceptancePercentage,  round((timeFinal - timeInitial * 10**(-9) ), ndigits=4)]], axis=0)
 
+            # Reinitialize the data for the next batch.
             acceptanceRatio = 0
             multiplicity = 1
 
             draws = np.zeros(shape=(0,dimensions + 1 ), dtype=np.int64)
 
+            # Save results after the last batch.
             if(n == iterationsNumber):
                  # Add batches' attributes to dataframe.
                 dfAllBatches = pd.DataFrame(allBatchesStatistics, columns=[ "acceptance rate (%)", "run time (s)"])
@@ -203,28 +245,29 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
                 dfAllBatches.to_csv(str(drawsFolder)+"/statistics_batches.csv", index=False, mode='w', header=True)
 
 
-        RWMonitor = True
+        RWMonitor = True # Check whether the proposed state is the same as the current.
 
         #Sampling proposed draw.
-        Cx = CxProbability = 1.0
+        conditionalCurrentProbability = conditionalProposedProbability = 1.0
 
         for i in range(len(gaussianDraw)):
 
             while(True):
-                drawFloatSample = 2*gridLength
-                while(np.abs(drawFloatSample) >= gridLength):
-                    drawFloatSample = 10*(deviation*np.random.randn() + mean)
-                gaussianDraw[i] = int(round(drawFloatSample))
-                proposedDraw[i] = draw[i] + gaussianDraw[i]
+                drawFloatSample = np.repeat(2*gridLength, dimensions) # To sample the Guassian deformation.
+                while(np.any(drawFloatSample >= gridLength)):
+                    drawFloatSample = np.around(np.random.randn(dimensions), decimals=0).astype(int)
+                                                
+                gaussianDraw[i] = drawFloatSample[i] # Return an array of integers from a normal distribution.
+                proposedDraw[i] = draw[i] + gaussianDraw[i] # Find the proposed draw.
             
-                if((1 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) and (proposedDraw[i] > 0)):
+                if((1 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) and (proposedDraw[i] > 0)): # Conditions to respect in order to continue with the proposed state.
                     break
             
             if(gaussianDraw[i] != 0):
                 RWMonitor = False
             
-            Cx *= truncatedCoefficients[draw[i]]
-            CxProbability *= truncatedCoefficients[proposedDraw[i]]
+            conditionalCurrentProbability *= truncatedCoefficients[draw[i]] # Conditional probability of the current draw.
+            conditionalProposedProbability *= truncatedCoefficients[proposedDraw[i]] # Conditional probability of the proposed state.
 
         if(RWMonitor == True):
             acceptanceRatio += 1
@@ -239,11 +282,11 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
                 print("draw is",draw[:-1],"\nproposedDraw is",proposedDraw,"\namplitude is",amplitude)
             
             
-            positionProbability = grid_rewards_2d(gridLength=gridLength)            
+            positionProbability = rewardFunction(gridLength=gridLength)            
             proposedAmplitude = positionProbability[tuple(proposedDraw)]
 
 
-            probability = np.amin([1, (proposedAmplitude**2)/ (amplitude**2) * (Cx / CxProbability)])
+            probability = np.amin([1, (proposedAmplitude**2)/ (amplitude**2) * (conditionalCurrentProbability / conditionalProposedProbability)]) # The stohastic part of the MCMC.
 
             if(np.isnan(probability)):
                 raise ValueError("Got NaN while computing densitites ration: proposedDraw", proposedDraw, "amplitude= ", amplitude)
@@ -256,7 +299,7 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
 
                 if(n > burnFactor):
                     
-                    draws = np.append(draws, np.array([np.append(draw[:-1] - 1, multiplicity)]), axis=0)
+                    draws = np.append(draws, np.array([np.append(draw[:-1] - 1, multiplicity)]), axis=0) # Add state tp the batch's draws.
 
                     if(verbosity > 1):
                         print("The old draw", draw[:-1], "has been stores with multiplicity", draw[-1])
@@ -264,7 +307,7 @@ def VertexMCMC(spinJ, iterationsNumber, batchSize, deviation, burnFactor, verbos
                 multiplicity = 1
 
                 for i in range(len(proposedDraw)):
-                    draw[i] = proposedDraw[i]
+                    draw[i] = proposedDraw[i] # Set proposed state as the current state.
                 
                 amplitude = proposedAmplitude
                 acceptanceRatio += 1
