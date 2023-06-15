@@ -233,9 +233,9 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
                 os.makedirs(str(drawsFolder), exist_ok=True)   
             
             
-            dfCurrentBatch = pd.DataFrame(draws, columns=[ "dimension1",
-                    "dimension2",
-                    "multiplicity"]
+            dfCurrentBatch = pd.DataFrame(
+                draws,
+                columns=[f"dimension{i+1}" for i in range(dimensions)] + ["multiplicity"]
             ) # DataFrame to save the states visited in the current batch.
             
             # Write new batch to csv.
