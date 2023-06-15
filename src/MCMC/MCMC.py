@@ -4,7 +4,7 @@ import time
 import matplotlib.pyplot as plt
 import os
 import sys
-from scipy.stats import truncnorm
+from scipy.stats import norm
 
 os.chdir(sys.path[0])
 
@@ -77,10 +77,10 @@ def cdfNormaDistribution(mean=0., deviation=1., dataPoints=1e5):
     
     data = deviation*np.random.randn(int(dataPoints)) + mean
 
-    # Sort the data in an ascending order.
+    # Sort the values of the random variable.
     x = np.sort(data)
 
-    # Get the values of the y-axis.
+    # Get the values of the respective probability.
     y = np.arange(dataPoints)/ float(dataPoints)
 
     
@@ -118,9 +118,10 @@ def discreteNormalDistribution(gridLength, mean=0.0, deviation=1.0):
         for n in range(-i, gridLength-i):
             
             # Probability debsity function of a normal distribution.
-            var, cdf = cdfNormaDistribution(mean, deviation) # var -> random variable, cdf -> the corresponding value for var
+            #var, cdf = cdfNormaDistribution(mean, deviation) # var -> random variable, cdf -> the corresponding value for var
 
-            cdfDifferences += cdf[np.argmax(var > n + 0.5)] - cdf[np.argmax(var > n - 0.5)] # Find the cumulative probability in each point.
+            #cdfDifferences += cdf[np.argmax(var > n + 0.5)] - cdf[np.argmax(var > n - 0.5)] # Find the cumulative probability in each point.
+            cdfDifferences += (norm.cdf(n + 0.5) - norm.cdf(n - 0.5))
 
         truncatedCoefficients[i] = cdfDifferences
         
