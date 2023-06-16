@@ -6,8 +6,6 @@ import os
 import sys
 from scipy.stats import norm
 
-os.chdir(sys.path[0])
-
 def grid_rewards_2d(gridLength=13, r0=0.1, r1=0.5, r2=2.0):
     """
     Calculate a 2D grid reward fucntion.
@@ -199,11 +197,11 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
     
     RWMonitor = True
 
-    dfAllBatches = pd.DataFrame({"acceptance rate (%)":[], "run time (s)":[]}) # DataFrame to save universal data for the eah batch.
+    dfAllBatches = pd.DataFrame({"acceptance rate (%)":[], "run time (s)":[]}) # DataFrame to save universal data for the each batch.
 
     batchCounter = 0 # Indicator to be used naming each batch.
 
-    draws = np.empty( shape=(1,dimensions + 1)) # Array to save the states visited in each batch.
+    draws = np.empty( shape=(0,dimensions + 1)) # Array to save the states visited in each batch.
 
     allBatchesStatistics = np.zeros(shape=(0,2)) # Array to keep the changes which will be passed in the dfAllBatches DataFrame.
 
@@ -218,7 +216,7 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
             
             if(verbosity >1):
                 print(n,"iterations reached, time to store",batchSize,"draws.")
-            draws = np.append(draws, np.array([np.append(draw[:-1] - 1, multiplicity)]), axis=0)
+            draws = np.append(draws, np.array([np.append(draw[:-1], multiplicity)]), axis=0)
 
             if(verbosity > 1):
                 print("The last draw", draw[:-1],"has been stored with multiplicity", draw[-1])
@@ -276,7 +274,7 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
                 gaussianDraw[i] = drawFloatSample[i] # Return an array of integers from a normal distribution.
                 proposedDraw[i] = draw[i] + gaussianDraw[i] # Find the proposed draw.
             
-                if((1 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) and (proposedDraw[i] > 0)): # Conditions to respect in order to continue with the proposed state.
+                if((0 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) ): # Conditions to respect in order to continue with the proposed state.
                     break
             
             if(gaussianDraw[i] != 0):
@@ -298,7 +296,7 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
                 print("draw is",draw[:-1],"\nproposedDraw is",proposedDraw,"\namplitude is",amplitude)
             
             
-            positionProbability = rewardFunction(gridLength=gridLength)            
+                    
             proposedAmplitude = positionProbability[tuple(proposedDraw)]
 
 
@@ -315,7 +313,7 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
 
                 if(n > burnFactor):
                     
-                    draws = np.append(draws, np.array([np.append(draw[:-1] - 1, multiplicity)]), axis=0) # Add state tp the batch's draws.
+                    draws = np.append(draws, np.array([np.append(draw[:-1], multiplicity)]), axis=0) # Add state tp the batch's draws.
 
                     if(verbosity > 1):
                         print("The old draw", draw[:-1], "has been stores with multiplicity", draw[-1])
