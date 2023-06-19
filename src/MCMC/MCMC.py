@@ -119,7 +119,7 @@ def discreteNormalDistribution(gridLength, mean=0.0, deviation=1.0):
             #var, cdf = cdfNormaDistribution(mean, deviation) # var -> random variable, cdf -> the corresponding value for var
 
             #cdfDifferences += cdf[np.argmax(var > n + 0.5)] - cdf[np.argmax(var > n - 0.5)] # Find the cumulative probability in each point.
-            cdfDifferences += (norm.cdf(n + 0.5) - norm.cdf(n - 0.5))
+            cdfDifferences += (norm.cdf(n + 0.5, loc=mean, scale=deviation) - norm.cdf(n - 0.5, loc=mean, scale=deviation))
 
         truncatedCoefficients[i] = cdfDifferences
         
@@ -170,24 +170,24 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
     
     
     # The truncated coefficients for the discrete gaussian distribution.
-    truncatedCoefficients = discreteNormalDistribution(gridLength, 0, deviation)
+    truncatedCoefficients = discreteNormalDistribution(gridLength, mean, deviation)
 
     draw = np.zeros(dimensions + 1, dtype=np.int64) # The current draw (state).
     gaussianDraw = np.zeros(dimensions , np.int64) # The guassian deformation to be added in the current draw (state).
 
-    amplitude = 0.0 # value of the reward function for the current draw.
+    prob = 0.0 # value of the reward function for the current draw.
   
-    while( amplitude == 0 ):
+    while( prob == 0 ):
         for i in range(np.size(draw)):
             draw[i] = np.random.randint(gridLength) # Initialize current draw.
         
         positionProbability = rewardFunction(gridLength) 
-        amplitude = positionProbability[tuple(draw[:-1])]
+        prob = positionProbability[tuple(draw[:-1])]
         
     draw[-1] = 1 # Initial multiplicity
 
     if (verbosity > 1):
-        print("Initial draw is", draw[:-1],"with amplitude", amplitude)
+        print("Initial draw is", draw[:-1],"with prob", prob)
 
     # Proposed draw (to be determinned adding the guassian deformation to the current draw).
     proposedDraw = np.zeros(dimensions , dtype=np.int64)
@@ -267,11 +267,13 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
         for i in range(len(gaussianDraw)):
 
             while(True):
-                drawFloatSample = np.repeat(2*gridLength, dimensions) # To sample the Guassian deformation.
-                while(np.any(drawFloatSample >= gridLength)):
-                    drawFloatSample = np.around(np.random.randn(dimensions), decimals=0).astype(int)
+                # drawFloatSample = np.repeat(2*gridLength, dimensions) # To sample the Guassian deformation.
+                # while(np.any(drawFloatSample >= gridLength)):
+                #     drawFloatSample = np.around(deviation*np.random.randn(dimensions) + mean, decimals=0).astype(int)
+                drawFloatSample = np.around(deviation*np.random.randn() + mean, decimals=0).astype(int)
                                                 
-                gaussianDraw[i] = drawFloatSample[i] # Return an array of integers from a normal distribution.
+                # gaussianDraw[i] = drawFloatSample[i] # Return an array of integers from a normal distribution.
+                gaussianDraw[i] = drawFloatSample
                 proposedDraw[i] = draw[i] + gaussianDraw[i] # Find the proposed draw.
             
                 if((0 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) ): # Conditions to respect in order to continue with the proposed state.
@@ -293,17 +295,17 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
             
         else:
             if(verbosity > 1):
-                print("draw is",draw[:-1],"\nproposedDraw is",proposedDraw,"\namplitude is",amplitude)
+                print("draw is",draw[:-1],"\nproposedDraw is",proposedDraw,"\nprob is",prob)
             
             
                     
-            proposedAmplitude = positionProbability[tuple(proposedDraw)]
+            proposedProb = positionProbability[tuple(proposedDraw)]
 
 
-            probability = np.amin([1, (proposedAmplitude**2)/ (amplitude**2) * (conditionalCurrentProbability / conditionalProposedProbability)]) # The stohastic part of the MCMC.
+            probability = np.amin([1, (proposedProb/prob) * (conditionalCurrentProbability / conditionalProposedProbability)]) # The stohastic part of the MCMC.
 
             if(np.isnan(probability)):
-                raise ValueError("Got NaN while computing densitites ration: proposedDraw", proposedDraw, "amplitude= ", amplitude)
+                raise ValueError("Got NaN while computing densitites ration: proposedDraw", proposedDraw, "prob= ", prob)
 
             randomNumber = np.random.rand()
 
@@ -323,18 +325,18 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
                 for i in range(len(proposedDraw)):
                     draw[i] = proposedDraw[i] # Set proposed state as the current state.
                 
-                amplitude = proposedAmplitude
+                prob = proposedProb
                 acceptanceRatio += 1
 
                 if(verbosity > 1):
-                    print("Now the new draw is", draw[:-1],"\nthe new amplitude is", amplitude)
+                    print("Now the new draw is", draw[:-1],"\nthe new prob is", prob)
             
             else:
                 multiplicity += 1
                 if(verbosity > 1):
                     print("proposedDraw", proposedDraw, "was rejected, since probability=", probability, "and randomNumber=",randomNumber)
                     print("The current draw", draw[:-1], "remains the same and its multiplicity is:", multiplicity)
-                    print("Amplitude", amplitude, "remains the same")
+                    print("Prob", prob, "remains the same")
             
 
 
