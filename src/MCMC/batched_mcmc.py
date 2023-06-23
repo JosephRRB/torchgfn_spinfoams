@@ -1,3 +1,7 @@
+import os
+from pathlib import Path
+from tqdm import tqdm
+
 import numpy as np
 from scipy.stats import norm
 
@@ -11,7 +15,7 @@ class MCMCRunner:
         side_len = np.unique(grid_rewards.shape)
         assert len(side_len) == 1
         self.grid_length = side_len[0]
-        self.grid_dim = len(grid_rewards.shape)
+        self.grid_dim = len(grid_rewards.shape) # grid_rewards.ndim
         self.scale = proposal_distribution_scale
 
         self.grid_rewards = grid_rewards
@@ -82,11 +86,15 @@ class MCMCRunner:
         acceptance_probabilities = np.minimum(1.0, backward / forward)
         return acceptance_probabilities
 
-    def run_mcmc_chains(self, batch_size, chain_length):
+    def run_mcmc_chains(
+            self, batch_size, n_iterations, generated_data_dir
+    ):
+        os.makedirs(generated_data_dir, exist_ok=True)
         current_coordinates = self.generate_initial_coordinates(batch_size)
 
-        mcmc_chains = [current_coordinates.copy()]
-        for i in range(1, chain_length):
+        mcmc_chains = []
+        acceptance_masks = []
+        for _ in tqdm(range(n_iterations)):
             next_coordinates = self.choose_next_coordinates(current_coordinates)
             acceptance_probabilities = self._calculate_acceptance_probabilities(
                 current_coordinates, next_coordinates
@@ -94,7 +102,19 @@ class MCMCRunner:
             uniform_random = self.rand_gen.random(size=batch_size)
             acceptance_mask = uniform_random <= acceptance_probabilities
             current_coordinates[acceptance_mask] = next_coordinates[acceptance_mask]
+
             mcmc_chains.append(current_coordinates.copy())
+            acceptance_masks.append(acceptance_mask.copy())
 
         mcmc_chains = np.stack(mcmc_chains)
-        return mcmc_chains
+        acceptance_masks = np.stack(acceptance_masks)
+
+        np.save(
+            f"{generated_data_dir}/mcmc_chains.npy",
+            mcmc_chains
+        )
+        np.save(
+            f"{generated_data_dir}/acceptance_masks.npy",
+            acceptance_masks
+        )
+        return mcmc_chains, acceptance_masks

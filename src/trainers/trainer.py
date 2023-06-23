@@ -123,15 +123,13 @@ def train_gfn(
 def base_train_gfn(
     env,
     generated_data_dir,
+    batch_size,
+    n_iterations,
     hidden_dim=256,
     n_hidden_layers=2,
     activation_fn="relu",
-    exploration_rate=0.5,
+    exploration_rate=0.0,
     learning_rate=0.0005,
-    batch_size=int(1e3),
-    n_iterations=int(1e4),
-    evaluation_batch_size=int(1e6),
-    generate_samples_every_m_training_samples=int(1e6),
 ):
     logit_PF = LogitPFEstimator(
         env=env,
@@ -143,7 +141,7 @@ def base_train_gfn(
     logit_PB = LogitPBEstimator(
         env=env,
         module_name="NeuralNet",
-        torso=logit_PF.module.torso,  # To share parameters between PF and PB
+        torso=logit_PF.module.torso,
     )
     logZ = LogZEstimator(torch.tensor(0.0))
 
@@ -153,9 +151,6 @@ def base_train_gfn(
             estimator=logit_PF,
             epsilon=exploration_rate
         )
-    )
-    eval_sampler = TrajectoriesSampler(
-        env=env, actions_sampler=DiscreteActionsSampler(estimator=logit_PF)
     )
 
     parametrization = TBParametrization(logit_PF, logit_PB, logZ)
@@ -167,7 +162,6 @@ def base_train_gfn(
     params = [
         {
             "params": [
-                # val for key, val in parametrization.parameters.items() if "logZ" not in key
                 val for key, val in parametrization.parameters.items() if ("PF" in key) or ("PB_last" in key)
             ],
             "lr": learning_rate,
@@ -179,7 +173,8 @@ def base_train_gfn(
     losses = []
     os.makedirs(generated_data_dir, exist_ok=True)
 
-    for i in (pbar := tqdm(range(n_iterations))):
+    terminal_states = []
+    for _ in tqdm(range(n_iterations)):
         trajectories = training_sampler.sample(
             n_trajectories=batch_size
         )
@@ -189,25 +184,16 @@ def base_train_gfn(
         loss.backward()
         optimizer.step()
 
-        trained_on_k_samples = (i + 1) * batch_size
-        if trained_on_k_samples % generate_samples_every_m_training_samples == 0:
-            pbar.set_postfix({"loss": loss.item()})
-            eval_trajectories = eval_sampler.sample(
-                n_trajectories=evaluation_batch_size
-            )
-            samples_file = Path(
-                f"{generated_data_dir}/"
-                f"epoch_{i + 1}"
-                f"_after_learn_from_{trained_on_k_samples}"
-                "_train_samples.csv"
-            )
-            samples_file.touch()
+        terminal_states.append(
+            trajectories.last_states.states_tensor.numpy()
+        )
 
-            np.savetxt(
-                samples_file,
-                eval_trajectories.last_states.states_tensor.numpy(),
-                delimiter=",",
-                fmt="%i",
-            )
         losses.append(loss.item())
-    return losses
+
+    terminal_states = np.stack(terminal_states)
+
+    np.save(
+        f"{generated_data_dir}/terminal_states.npy",
+        terminal_states
+    )
+    return terminal_states, losses
