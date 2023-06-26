@@ -9,6 +9,7 @@ from gfn import LogitPBEstimator, LogitPFEstimator, LogZEstimator
 from gfn.losses import TBParametrization, TrajectoryBalance
 from gfn.samplers import DiscreteActionsSampler, TrajectoriesSampler
 
+from src.losses.weighted_tb import WeightedTrajectoryBalance
 from src.spinfoam.spinfoams import SingleVertexSpinFoam, StarModelSpinFoam
 from src.spinfoam.sf_env import SpinFoamEnvironment
 
@@ -152,9 +153,16 @@ def base_train_gfn(
             epsilon=exploration_rate
         )
     )
+    eval_sampler = TrajectoriesSampler(
+        env=env, actions_sampler=DiscreteActionsSampler(estimator=logit_PF)
+    )
 
     parametrization = TBParametrization(logit_PF, logit_PB, logZ)
-    loss_fn = TrajectoryBalance(
+    # loss_fn = TrajectoryBalance(
+    #     parametrization=parametrization,
+    #     log_reward_clip_min=-500.0
+    # )
+    loss_fn = WeightedTrajectoryBalance(
         parametrization=parametrization,
         log_reward_clip_min=-500.0
     )
@@ -184,9 +192,15 @@ def base_train_gfn(
         loss.backward()
         optimizer.step()
 
-        terminal_states.append(
-            trajectories.last_states.states_tensor.numpy()
-        )
+        if exploration_rate:
+            eval_trajectories = eval_sampler.sample(
+                n_trajectories=batch_size
+            )
+            states = eval_trajectories.last_states.states_tensor.numpy()
+        else:
+            states = trajectories.last_states.states_tensor.numpy()
+
+        terminal_states.append(states)
 
         losses.append(loss.item())
 
