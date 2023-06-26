@@ -6,14 +6,14 @@ import os
 import sys
 from scipy.stats import norm
 
-def grid_rewards_2d(gridLength=13, r0=0.1, r1=0.5, r2=2.0):
+def grid_rewards_2d(grid_length=13, r0=0.1, r1=0.5, r2=2.0):
     """
     Calculate a 2D grid reward fucntion.
     
     Parameters
     ----------
 
-    gridLength: (float)
+    grid_length: (float)
                 - The length of the grid.
     
     r0: (float)
@@ -28,13 +28,13 @@ def grid_rewards_2d(gridLength=13, r0=0.1, r1=0.5, r2=2.0):
     Return:
         -------
     rewards: (array)
-                - A 2D array with the corresponding values of the function in the 2D grid of length gridLength.
+                - A 2D array with the corresponding values of the function in the 2D grid of length grid_length.
                       
     """
 
-    assert gridLength >= 7
+    assert grid_length >= 7
     
-    coord_1d_dist_from_center = np.abs(np.arange(gridLength) / (gridLength - 1) - 0.5)
+    coord_1d_dist_from_center = np.abs(np.arange(grid_length) / (grid_length - 1) - 0.5)
     mid_level_1d = (coord_1d_dist_from_center > 0.25).astype(float)
     mid_level_2d = mid_level_1d[None, :]*mid_level_1d[:, None]
     high_level_1d = ((coord_1d_dist_from_center > 0.3) * (coord_1d_dist_from_center < 0.4)).astype(float)
@@ -43,55 +43,15 @@ def grid_rewards_2d(gridLength=13, r0=0.1, r1=0.5, r2=2.0):
     rewards = r0 + r1*mid_level_2d + r2*high_level_2d
     return  rewards
 
-def cdfNormaDistribution(mean=0., deviation=1., dataPoints=1e5):
+
+def discrete_normal_distribution(grid_length, mean=0.0, deviation=1.0):
     """
-    Calculate the cdf of a normal distribution. 
+    Calculate the normal disctribution of discrete variables. 
     
     Parameters
     ----------
 
-    var: (float)
-                - The point where we want ot find the cdf value.
-    
-    mean: (float)
-                - The location of the normal distribution.
-
-    deviation: (float)
-                - The deviation of the noirmal distribution.
-
-    dataPoints: (integer)
-                - Number of points drawn from the normal distribution.
-                - Number of points returned.
-
-    cdfAccuracy: (integer)
-                - Number of points to regard in the cdf.
-
-    Return:
-        -------
-                - An array containing two subarrays: one with the values
-                of the random variable and one with its corresponding probability
-                      
-    """
-    
-    data = deviation*np.random.randn(int(dataPoints)) + mean
-
-    # Sort the values of the random variable.
-    x = np.sort(data)
-
-    # Get the values of the respective probability.
-    y = np.arange(dataPoints)/ float(dataPoints)
-
-    
-    return [x,y]
-
-def discreteNormalDistribution(gridLength, mean=0.0, deviation=1.0):
-    """
-    Calculate the noraml disctribution of discrete variables. 
-    
-    Parameters
-    ----------
-
-    dataPoints: (integer)
+    grid_length: (integer)
                 - Number of points drawn from the normal distribution.
                 - Number of points returned.
 
@@ -104,29 +64,24 @@ def discreteNormalDistribution(gridLength, mean=0.0, deviation=1.0):
 
     Return:
         -------
-        truncatedCoefficients: (array)
+        truncated_coefficients: (array)
                  - The probability density function of a truncated discrete normal distribution.
-                 - Its number is given by the dataPoints. 
+                 - Its number is given by the grid_length. 
                       
     """
-    truncatedCoefficients = np.zeros(gridLength, dtype=np.float64)
+    truncated_coefficients = np.zeros(grid_length, dtype=np.float64)
 
-    for i in range(0,gridLength):
-        cdfDifferences = 0.0
-        for n in range(-i, gridLength-i):
-            
-            # Probability debsity function of a normal distribution.
-            #var, cdf = cdfNormaDistribution(mean, deviation) # var -> random variable, cdf -> the corresponding value for var
+    for i in range(0,grid_length):
+        cdf_differences = 0.0
+        for n in range(-i, grid_length-i):
+            cdf_differences += (norm.cdf(n + 0.5, loc=mean, scale=deviation) - norm.cdf(n - 0.5, loc=mean, scale=deviation))
 
-            #cdfDifferences += cdf[np.argmax(var > n + 0.5)] - cdf[np.argmax(var > n - 0.5)] # Find the cumulative probability in each point.
-            cdfDifferences += (norm.cdf(n + 0.5, loc=mean, scale=deviation) - norm.cdf(n - 0.5, loc=mean, scale=deviation))
-
-        truncatedCoefficients[i] = cdfDifferences
+        truncated_coefficients[i] = cdf_differences
         
-    return truncatedCoefficients
+    return truncated_coefficients/np.sum(truncated_coefficients)
 
 
-def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, drawsFolder, deviation, mean = 0., rewardFunction = grid_rewards_2d, dimensions = 2):
+def VertexMCMC(grid_length, iterations_number, batch_size, burn_factor, verbosity, draws_folder, deviation, mean = 0., reward_function = grid_rewards_2d, dimensions = 2):
 
     """
     Run the MCMC simulation and save results in the corresponding folder. 
@@ -134,19 +89,19 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
     Parameters
     ----------
    
-    iterationsNumber: (integer)
+    iterations_number: (integer)
                 - The number of iterations for the MCMC.
 
-    batchSize: (integer)
+    batch_size: (integer)
                 - The number of iterations per batch.
 
-    burnFactor: (integer)
+    burn_factor: (integer)
                 - The number of iterations discarded in each batch due to non-convergence.
 
     verbosity: (integer)
                 - Whether information should be printed.
     
-    drawsFolder: (string)
+    draws_folder: (string)
                 - The lcoation of the data folder.
     
     deviation: (float)
@@ -155,9 +110,9 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
     mean: (float)
                 - The mean of our Gaussian distribution.
 
-    rewardFunction: (function)
+    reward_function: (function)
                 - The reward function our MCMC is trying to lean from. 
-                - Should return a 'dimensions' times array where is dimension has gridLength.
+                - Should return a 'dimensions' times array where is dimension has grid_length.
 
     dimensions: (integer)
                 - The number of dimensions.
@@ -165,24 +120,24 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
     """
 
     # Make sure number of iterations is an integer multiple of the batch size.
-    if(iterationsNumber % batchSize != 0):
+    if(iterations_number % batch_size != 0):
         raise ValueError("Number of iterations must be a multiple of batch size.")
     
     
-    # The truncated coefficients for the discrete gaussian distribution.
-    truncatedCoefficients = discreteNormalDistribution(gridLength, mean, deviation)
+    # The probability of each state happening in the gid. discrete_normal_distribution gives an almost unifrom sitribution for every grid point.
+    truncated_coefficients = discrete_normal_distribution(grid_length=grid_length, mean=mean, deviation=deviation)
 
     draw = np.zeros(dimensions + 1, dtype=np.int64) # The current draw (state).
-    gaussianDraw = np.zeros(dimensions , np.int64) # The guassian deformation to be added in the current draw (state).
+    gaussian_draw = np.zeros(dimensions , np.int64) # The guassian deformation to be added in the current draw (state).
 
-    prob = 0.0 # value of the reward function for the current draw.
+    prob = 0.0 # Value of the reward function for the current draw.
   
     while( prob == 0 ):
         for i in range(np.size(draw)):
-            draw[i] = np.random.randint(gridLength) # Initialize current draw.
+            draw[i] = np.random.randint(grid_length) # Initialize current draw.
         
-        positionProbability = rewardFunction(gridLength) 
-        prob = positionProbability[tuple(draw[:-1])]
+        position_probability = reward_function(grid_length) 
+        prob = position_probability[tuple(draw[:-1])]
         
     draw[-1] = 1 # Initial multiplicity
 
@@ -190,143 +145,143 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
         print("Initial draw is", draw[:-1],"with prob", prob)
 
     # Proposed draw (to be determinned adding the guassian deformation to the current draw).
-    proposedDraw = np.zeros(dimensions , dtype=np.int64)
+    proposed_draw = np.zeros(dimensions , dtype=np.int64)
 
-    acceptanceRatio = 0 # To measure the percentage of accepted moves by the simulator. Estimator of the codes optimization.
+    acceptance_ratio = 0 # To measure the percentage of accepted moves by the simulator. _estimator of the codes optimization.
     multiplicity = 1    # Initial multiplicity counter.
     
-    RWMonitor = True
+    RW_monitor = True
 
-    dfAllBatches = pd.DataFrame({"acceptance rate (%)":[], "run time (s)":[]}) # DataFrame to save universal data for the each batch.
+    df_all_batches = pd.DataFrame({"acceptance rate (%)":[], "run time (s)":[]}) # DataFrame to save universal data for the each batch.
 
-    batchCounter = 0 # Indicator to be used naming each batch.
+    batch_counter = 0 # Indicator to be used naming each batch.
 
     draws = np.empty( shape=(0,dimensions + 1)) # Array to save the states visited in each batch.
 
-    allBatchesStatistics = np.zeros(shape=(0,2)) # Array to keep the changes which will be passed in the dfAllBatches DataFrame.
+    all_batches_statistics = np.zeros(shape=(0,2)) # Array to keep the changes which will be passed in the df_all_batches DataFrame.
 
-    for n in range(1, iterationsNumber+1):
+    for n in range(1, iterations_number+1):
         if(verbosity > 1):
             print("Iteration ", n, "---------------------------------------------------------------")
 
         timeInitial = time.time_ns() # Initial time
 
 
-        if( n % batchSize ==0 ):
+        if( n % batch_size ==0 ):
             
             if(verbosity >1):
-                print(n,"iterations reached, time to store",batchSize,"draws.")
+                print(n,"iterations reached, time to store",batch_size,"draws.")
             draws = np.append(draws, np.array([np.append(draw[:-1], multiplicity)]), axis=0)
 
             if(verbosity > 1):
                 print("The last draw", draw[:-1],"has been stored with multiplicity", draw[-1])
             
-            acceptancePercentage = acceptanceRatio * 100/ batchSize
+            acceptance_percentage = acceptance_ratio * 100/ batch_size
 
-            #print(acceptancePercentage,"of proposed draws have beem accepted in this batch (in master chain).")
+            #print(acceptance_percentage,"of proposed draws have beem accepted in this batch (in master chain).")
 
-            batchCounter += 1
+            batch_counter += 1
 
             # Create file and layout.
-            if(not os.path.exists(str(drawsFolder)+"/draws_batch_n_"+str(batchCounter)+".csv")):
-                os.makedirs(str(drawsFolder), exist_ok=True)   
+            if(not os.path.exists(str(draws_folder)+"/draws_batch_n_"+str(batch_counter)+".csv")):
+                os.makedirs(str(draws_folder), exist_ok=True)   
             
             
-            dfCurrentBatch = pd.DataFrame(
+            df_current_batch = pd.DataFrame(
                 draws,
                 columns=[f"dimension{i+1}" for i in range(dimensions)] + ["multiplicity"]
             ) # DataFrame to save the states visited in the current batch.
             
             # Write new batch to csv.
-            dfCurrentBatch.to_csv(str(drawsFolder)+"/draws_batch_n_"+str(batchCounter)+".csv", index=False, mode='w', header=True)
+            df_current_batch.to_csv(str(draws_folder)+"/draws_batch_n_"+str(batch_counter)+".csv", index=False, mode='w', header=True)
 
             
-            timeFinal = time.time_ns()
+            time_final = time.time_ns()
 
-            allBatchesStatistics = np.append(allBatchesStatistics, [[acceptancePercentage,  round((timeFinal - timeInitial * 10**(-9) ), ndigits=4)]], axis=0)
+            all_batches_statistics = np.append(all_batches_statistics, [[acceptance_percentage,  round((time_final - timeInitial * 10**(-9) ), ndigits=4)]], axis=0)
 
             # Reinitialize the data for the next batch.
-            acceptanceRatio = 0
+            acceptance_ratio = 0
             multiplicity = 1
 
             draws = np.zeros(shape=(0,dimensions + 1 ), dtype=np.int64)
 
             # Save results after the last batch.
-            if(n == iterationsNumber):
+            if(n == iterations_number):
                  # Add batches' attributes to dataframe.
-                dfAllBatches = pd.DataFrame(allBatchesStatistics, columns=[ "acceptance rate (%)", "run time (s)"])
+                df_all_batches = pd.DataFrame(all_batches_statistics, columns=[ "acceptance rate (%)", "run time (s)"])
                 # Write them to csv. 
-                dfAllBatches.to_csv(str(drawsFolder)+"/statistics_batches.csv", index=False, mode='w', header=True)
+                df_all_batches.to_csv(str(draws_folder)+"/statistics_batches.csv", index=False, mode='w', header=True)
 
 
-        RWMonitor = True # Check whether the proposed state is the same as the current.
+        RW_monitor = True # Check whether the proposed state is the same as the current.
 
-        #Sampling proposed draw.
-        conditionalCurrentProbability = conditionalProposedProbability = 1.0
+        # Sampling proposed draw.
+        conditional_current_probability = conditional_proposed_probability = 1.0
 
-        for i in range(len(gaussianDraw)):
+        for i in range(len(gaussian_draw)):
 
             while(True):
-                # drawFloatSample = np.repeat(2*gridLength, dimensions) # To sample the Guassian deformation.
-                # while(np.any(drawFloatSample >= gridLength)):
-                #     drawFloatSample = np.around(deviation*np.random.randn(dimensions) + mean, decimals=0).astype(int)
-                drawFloatSample = np.around(deviation*np.random.randn() + mean, decimals=0).astype(int)
+                # draw_float_sample = np.repeat(2*grid_length, dimensions) # To sample the Guassian deformation.
+                # while(np.any(draw_float_sample >= grid_length)):
+                #     draw_float_sample = np.around(deviation*np.random.randn(dimensions) + mean, decimals=0).astype(int)
+                draw_float_sample = np.around(deviation*np.random.randn() + mean, decimals=0).astype(int)
                                                 
-                # gaussianDraw[i] = drawFloatSample[i] # Return an array of integers from a normal distribution.
-                gaussianDraw[i] = drawFloatSample
-                proposedDraw[i] = draw[i] + gaussianDraw[i] # Find the proposed draw.
+                # gaussian_draw[i] = draw_float_sample[i] # Return an array of integers from a normal distribution.
+                gaussian_draw[i] = draw_float_sample
+                proposed_draw[i] = draw[i] + gaussian_draw[i] # Find the proposed draw.
             
-                if((0 <= proposedDraw[i]) and (proposedDraw[i] < gridLength) ): # Conditions to respect in order to continue with the proposed state.
+                if((0 <= proposed_draw[i]) and (proposed_draw[i] < grid_length) ): # Conditions to respect in order to continue with the proposed state.
                     break
             
-            if(gaussianDraw[i] != 0):
-                RWMonitor = False
+            if(gaussian_draw[i] != 0):
+                RW_monitor = False
             
-            conditionalCurrentProbability *= truncatedCoefficients[draw[i]] # Conditional probability of the current draw.
-            conditionalProposedProbability *= truncatedCoefficients[proposedDraw[i]] # Conditional probability of the proposed state.
+            conditional_current_probability *= truncated_coefficients[draw[i]] # Conditional probability of the current draw.
+            conditional_proposed_probability *= truncated_coefficients[proposed_draw[i]] # Conditional probability of the proposed state.
 
-        if(RWMonitor == True):
-            acceptanceRatio += 1
+        if(RW_monitor == True):
+            acceptance_ratio += 1
 
             multiplicity += 1
 
             if(verbosity > 1):
-                print("The propposedDraw:", proposedDraw[-1], "turns out to be equal to the current draw:", draw[:-1],"\nso that the multiplicity of the current draw is raised to",multiplicity)
+                print("The propposed_draw:", proposed_draw[-1], "turns out to be equal to the current draw:", draw[:-1],"\nso that the multiplicity of the current draw is raised to",multiplicity)
             
         else:
             if(verbosity > 1):
-                print("draw is",draw[:-1],"\nproposedDraw is",proposedDraw,"\nprob is",prob)
+                print("draw is",draw[:-1],"\nproposed_draw is",proposed_draw,"\nprob is",prob)
             
             
                     
-            proposedProb = positionProbability[tuple(proposedDraw)]
+            proposed_prob = position_probability[tuple(proposed_draw)]
 
 
-            probability = np.amin([1, (proposedProb/prob) * (conditionalCurrentProbability / conditionalProposedProbability)]) # The stohastic part of the MCMC.
+            probability = np.amin([1, (proposed_prob/prob) * (conditional_current_probability / conditional_proposed_probability)]) # The stohastic part of the MCMC.
 
             if(np.isnan(probability)):
-                raise ValueError("Got NaN while computing densitites ration: proposedDraw", proposedDraw, "prob= ", prob)
+                raise ValueError("_got NaN while computing densitites ration: proposed_draw", proposed_draw, "prob= ", prob)
 
-            randomNumber = np.random.rand()
+            random_number = np.random.rand()
 
-            if(randomNumber < probability):
+            if(random_number < probability):
                 if(verbosity > 1):
-                    print("prposedDraw", proposedDraw, "was accepted, since p=", probability, "and randomNumber", randomNumber)
+                    print("proposed_draw", proposed_draw, "was accepted, since p=", probability, "and random_number", random_number)
 
-                if(n > burnFactor):
+                if(n > burn_factor):
                     
-                    draws = np.append(draws, np.array([np.append(draw[:-1], multiplicity)]), axis=0) # Add state tp the batch's draws.
+                    draws = np.append(draws, np.array([np.append(draw[:-1], multiplicity)]), axis=0) # Add state to the batch's draws.
 
                     if(verbosity > 1):
                         print("The old draw", draw[:-1], "has been stores with multiplicity", draw[-1])
                     
                 multiplicity = 1
 
-                for i in range(len(proposedDraw)):
-                    draw[i] = proposedDraw[i] # Set proposed state as the current state.
+                for i in range(len(proposed_draw)):
+                    draw[i] = proposed_draw[i] # Set proposed state as the current state.
                 
-                prob = proposedProb
-                acceptanceRatio += 1
+                prob = proposed_prob
+                acceptance_ratio += 1
 
                 if(verbosity > 1):
                     print("Now the new draw is", draw[:-1],"\nthe new prob is", prob)
@@ -334,7 +289,7 @@ def VertexMCMC(gridLength, iterationsNumber, batchSize, burnFactor, verbosity, d
             else:
                 multiplicity += 1
                 if(verbosity > 1):
-                    print("proposedDraw", proposedDraw, "was rejected, since probability=", probability, "and randomNumber=",randomNumber)
+                    print("proposed_draw", proposed_draw, "was rejected, since probability=", probability, "and random_number=",random_number)
                     print("The current draw", draw[:-1], "remains the same and its multiplicity is:", multiplicity)
                     print("Prob", prob, "remains the same")
             
