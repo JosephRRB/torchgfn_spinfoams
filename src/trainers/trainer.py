@@ -156,4 +156,14 @@ def train_gfn(
         f"{generated_data_dir}/terminal_states.npy",
         terminal_states
     )
+    if replay_buffer:
+        np.save(
+            f"{generated_data_dir}/replay_states.npy",
+            replay_buffer.terminating_states.states_tensor.numpy()
+        )
+        np.save(
+            f"{generated_data_dir}/replay_log_rewards.npy",
+            replay_buffer.terminating_states.log_rewards.numpy()
+        )
+
     return terminal_states, losses
