@@ -101,6 +101,34 @@ class ForwardLogRelativeEdgeFlowEstimator(BaseSSRPolicy):
         return encoded_pairs
 
 
+class BackwardLogRelativeEdgeFlowEstimator(BaseSSRPolicy):
+    def __init__(
+        self, env: Env, **nn_kwargs,
+    ) -> None:
+        super().__init__(env, **nn_kwargs)
+
+    def __call__(self, states: States):
+        return self._get_masked_logits(states.states_tensor, states.backward_masks)
+
+    @staticmethod
+    def _get_destination_states(
+            duplicated_source_states, encoded_possible_actions
+    ):
+        destination_states = duplicated_source_states - encoded_possible_actions
+        return destination_states
+
+    def _encode_source_destination_state_pairs(self, states, masks):
+        encoded_backward_actions = self._encode_possible_actions(masks)
+        duplicated_states = self._repeat_source_states(states, masks)
+        parents = self._get_destination_states(duplicated_states, encoded_backward_actions)
+        encoded_parents = self._encode_states(parents)
+        encoded_states = self._encode_states(duplicated_states)
+        encoded_pairs = torch.cat([
+            encoded_states, encoded_parents
+        ], dim=1)
+        return encoded_pairs
+
+
 
 
 
