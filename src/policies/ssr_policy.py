@@ -21,9 +21,9 @@ class BaseSSRPolicy(FunctionEstimator):
         )
 
     @staticmethod
-    def _encode_possible_actions(masks):
+    def _encode_possible_actions(masks, action_dim):
         _, possible_actions = torch.where(masks)
-        encoded_possible_actions = one_hot(possible_actions)
+        encoded_possible_actions = one_hot(possible_actions, num_classes=action_dim)
         return encoded_possible_actions
 
     @staticmethod
@@ -84,14 +84,19 @@ class ForwardLogRelativeEdgeFlowEstimator(BaseSSRPolicy):
         return destination_states
 
     def _encode_source_destination_state_pairs(self, states, masks):
-        encoded_forward_actions = self._encode_possible_actions(masks)[:, :-1]
+        # Terminate action is encoded to [0, 0, 0, 0, 0]
+        encoded_forward_actions = self._encode_possible_actions(
+            masks, self.env.grid_dim + 1
+        )[:, :-1]
         duplicated_states = self._repeat_source_states(states, masks)
+        # sf states are reached when terminate action is done.
         children = self._get_destination_states(duplicated_states, encoded_forward_actions)
 
         non_sf_children_mask = torch.sum(encoded_forward_actions, dim=1).bool()
         encoded_children = torch.zeros(
             size=(children.shape[0], self.env.grid_dim * self.env.grid_len)
         )
+        # sf states are not one-hot encoded and are just set to all zeros
         encoded_children[non_sf_children_mask] = self._encode_states(children[non_sf_children_mask])
 
         encoded_states = self._encode_states(duplicated_states)
@@ -118,7 +123,7 @@ class BackwardLogRelativeEdgeFlowEstimator(BaseSSRPolicy):
         return destination_states
 
     def _encode_source_destination_state_pairs(self, states, masks):
-        encoded_backward_actions = self._encode_possible_actions(masks)
+        encoded_backward_actions = self._encode_possible_actions(masks, self.env.grid_dim)
         duplicated_states = self._repeat_source_states(states, masks)
         parents = self._get_destination_states(duplicated_states, encoded_backward_actions)
         encoded_parents = self._encode_states(parents)
