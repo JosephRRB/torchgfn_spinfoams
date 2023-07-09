@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 from tqdm import tqdm
 
 import numpy as np
@@ -9,6 +10,7 @@ from gfn.losses import SubTBParametrization, SubTrajectoryBalance
 from gfn.samplers import DiscreteActionsSampler, TrajectoriesSampler, BackwardDiscreteActionsSampler
 from gfn.containers.trajectories import Trajectories
 
+from src.policies.ssr_policy import ForwardLogRelativeEdgeFlowEstimator, BackwardLogRelativeEdgeFlowEstimator
 from src.replay_buffers.prioritized_replay_buffer import PrioritizedReplayBuffer
 
 
@@ -36,9 +38,10 @@ def train_gfn(
     n_iterations,
     learning_rate=0.0005,
     exploration_rate=0.0,
+    policy: Literal["sa", "ssr"] = "sa",
     forward_looking=False,
     loss_params=LOSS_PARAMS,
-    replay_params=REPLAY_PARAMS,
+    replay_params=REPLAY_PARAMS, # replay_params or None
     nn_params=NN_PARAMS,
 ):
     if replay_params:
@@ -49,38 +52,53 @@ def train_gfn(
     else:
         replay_buffer = None
 
-    logit_PF = LogitPFEstimator(
-        env=env,
-        module_name="NeuralNet",
-        **nn_params
-    )
-    logit_PB = LogitPBEstimator(
-        env=env,
-        module_name="NeuralNet",
-        torso=logit_PF.module.torso,
-    )
-    logF = LogStateFlowEstimator(
-        env=env,
-        module_name="NeuralNet",
-        torso=logit_PF.module.torso,
-        forward_looking=forward_looking
-    )
+    if policy == "sa":
+        forward_policy = LogitPFEstimator(
+            env=env,
+            module_name="NeuralNet",
+            **nn_params
+        )
+        backward_policy = LogitPBEstimator(
+            env=env,
+            module_name="NeuralNet",
+            torso=forward_policy.module.torso,
+        )
+        logF = LogStateFlowEstimator(
+            env=env,
+            module_name="NeuralNet",
+            torso=forward_policy.module.torso,
+            forward_looking=forward_looking
+        )
+    elif policy == "ssr":
+        forward_policy = ForwardLogRelativeEdgeFlowEstimator(
+            env=env, **nn_params
+        )
+        backward_policy = BackwardLogRelativeEdgeFlowEstimator(
+            env=env, **nn_params
+        )
+        logF = LogStateFlowEstimator(
+            env=env,
+            module_name="NeuralNet",
+            forward_looking=forward_looking
+        )
+    else:
+        raise NotImplementedError("Only 'sa' and 'ssr' policies are available")
 
     forward_sampler = TrajectoriesSampler(
         env=env,
         actions_sampler=DiscreteActionsSampler(
-            estimator=logit_PF,
+            estimator=forward_policy,
             epsilon=exploration_rate
         )
     )
     backward_sampler = TrajectoriesSampler(
-        env=env, actions_sampler=BackwardDiscreteActionsSampler(estimator=logit_PB,)
+        env=env, actions_sampler=BackwardDiscreteActionsSampler(estimator=backward_policy,)
     )
     eval_sampler = TrajectoriesSampler(
-        env=env, actions_sampler=DiscreteActionsSampler(estimator=logit_PF)
+        env=env, actions_sampler=DiscreteActionsSampler(estimator=forward_policy)
     )
 
-    parametrization = SubTBParametrization(logit_PF, logit_PB, logF)
+    parametrization = SubTBParametrization(forward_policy, backward_policy, logF)
     # Don't use stored log_probs because of backward trajectories
     # Their log_probs are for backward actions but loss uses them for forward actions
     loss_fn = SubTrajectoryBalance(
@@ -90,15 +108,17 @@ def train_gfn(
         **loss_params
     )
 
-    params = [
-        {
-            "params": [
-                val for key, val in parametrization.parameters.items() if ("PF_torso" in key) or ("last_layer" in key)
-            ],
-            "lr": learning_rate,
-        },
-    ]
-    optimizer = torch.optim.Adam(params=params)
+    if policy == "sa":
+        params = [
+            val for key, val in parametrization.parameters.items()
+            if ("PF_torso" in key) or ("last_layer" in key)
+        ]
+    else:
+        params = list(parametrization.parameters.values())
+
+    optimizer = torch.optim.Adam(
+        params=[{"params": params, "lr": learning_rate,}]
+    )
 
     losses = []
     terminal_states = []
