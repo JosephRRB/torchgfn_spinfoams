@@ -161,9 +161,9 @@ def train_gfn(
             eval_trajectories = eval_sampler.sample(
                 n_trajectories=batch_size
             )
-            states = eval_trajectories.last_states.states_tensor.numpy()
+            states = eval_trajectories.last_states.states_tensor.cpu().numpy()
         else:
-            states = trajectories.last_states.states_tensor.numpy()
+            states = trajectories.last_states.states_tensor.cpu().numpy()
 
         terminal_states.append(states)
 
