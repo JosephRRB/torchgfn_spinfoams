@@ -16,7 +16,7 @@ class PrioritizedReplayBuffer:
         self.env = env
         self.capacity = capacity
         self.terminating_states = env.States.from_batch_shape((0,))
-        self.terminating_states.log_rewards = torch.empty(size=(0,))
+        self.terminating_states.log_rewards = torch.empty(size=(0,)).to(env.device)
         self.fraction_of_samples_from_top = fraction_of_samples_from_top
         self.top_and_bottom_fraction = top_and_bottom_fraction
 

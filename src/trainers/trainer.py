@@ -132,6 +132,10 @@ def train_gfn(
             offline_trajectories.states.extend_with_sf(offline_trajectories.states.batch_shape[0] + 1)
         else:
             offline_trajectories = Trajectories(env=env)
+            offline_trajectories.actions = offline_trajectories.actions.to(env.device)
+            offline_trajectories.log_probs = offline_trajectories.log_probs.to(env.device)
+            offline_trajectories.when_is_done = offline_trajectories.when_is_done.to(env.device)
+
 
         n_samples_online = batch_size - offline_trajectories.n_trajectories
         trajectories = forward_sampler.sample(n_trajectories=n_samples_online)
@@ -148,7 +152,7 @@ def train_gfn(
                     ),
                     fill_value=0,
                     dtype=torch.float,
-                )
+                ).to(env.device)
             ], dim=0)
             trajectories.extend(offline_trajectories)
 
@@ -179,11 +183,11 @@ def train_gfn(
     if replay_buffer:
         np.save(
             f"{generated_data_dir}/replay_states.npy",
-            replay_buffer.terminating_states.states_tensor.numpy()
+            replay_buffer.terminating_states.states_tensor.cpu().numpy()
         )
         np.save(
             f"{generated_data_dir}/replay_log_rewards.npy",
-            replay_buffer.terminating_states.log_rewards.numpy()
+            replay_buffer.terminating_states.log_rewards.cpu().numpy()
         )
 
     return terminal_states, losses

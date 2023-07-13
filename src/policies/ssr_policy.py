@@ -95,7 +95,7 @@ class ForwardLogRelativeEdgeFlowEstimator(BaseSSRPolicy):
         non_sf_children_mask = torch.sum(encoded_forward_actions, dim=1).bool()
         encoded_children = torch.zeros(
             size=(children.shape[0], self.env.grid_dim * self.env.grid_len)
-        )
+        ).to(states.device)
         # sf states are not one-hot encoded and are just set to all zeros
         encoded_children[non_sf_children_mask] = self._encode_states(children[non_sf_children_mask])
 
