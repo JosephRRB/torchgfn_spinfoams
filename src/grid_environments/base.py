@@ -106,3 +106,42 @@ class BaseGrid(Env):
         ]
         return self.log_grid_rewards[indices]
 
+    @property
+    def n_states(self) -> int:
+        return self.grif_len**self.grid_dim
+
+    @property
+    def n_terminating_states(self) -> int:
+        digits = torch.arange(grid_len, device=self.device)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        terminating_states = [all_states if self.grid_dim in list else None for list in all_states]
+        terminating_states = [element for element in terminating_states if element is not None]
+        terminating_states = torch.cat(terminating_states)
+        n_terminating_states = terminating_states.size(1)
+        return n_terminating_states
+
+    @property
+    def all_states(self) -> States:
+        # This is brute force !
+        digits = torch.arange(grid_len, device=self.device)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        return self.States(all_states)
+
+    @property
+    def terminating_states(self) -> States:
+        digits = torch.arange(grid_len, device=self.device)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        terminating_states = [all_states if self.grid_dim in list else None for list in all_states]
+        terminating_states = [element for element in terminating_states if element is not None]
+        terminating_states = torch.cat(terminating_states)
+        return self.States(terminating_states)
+
+    @property
+    def true_dist_pmf(self) -> torch.Tensor:
+        true_dist = self.reward(self.terminating_states)
+        return true_dist / true_dist.sum()
+
+    @property
+    def log_partition(self) -> float:
+        log_rewards = self.log_reward(self.terminating_states)
+        return torch.logsumexp(log_rewards, -1).item()
