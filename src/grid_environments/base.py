@@ -18,6 +18,8 @@ TensorBool = TensorType["batch_shape", torch.bool]
 ForwardMasksTensor = TensorType["batch_shape", "n_actions", torch.bool]
 BackwardMasksTensor = TensorType["batch_shape", "n_actions - 1", torch.bool]
 StatesTensor = TensorType["batch_shape", "state_shape", torch.float]
+BatchTensor = TensorType["batch_shape"]
+
 
 class BaseGrid(Env):
     def __init__(
@@ -37,6 +39,7 @@ class BaseGrid(Env):
         s0 = torch.zeros(
             self.grid_dim, dtype=torch.long, device=self.device
         )
+        
         sf = torch.full(
             (self.grid_dim,), fill_value=-1, dtype=torch.long, device=self.device
         )
@@ -126,6 +129,15 @@ class BaseGrid(Env):
         digits = torch.arange(grid_len, device=self.device)
         all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
         return self.States(all_states)
+    
+    def get_states_indices(self, states: States) -> BatchTensor:
+        states_raw = states.states_tensor
+
+        canonical_base = self.height ** torch.arange(
+            self.ndim - 1, -1, -1, device=states_raw.device
+        )
+        indices = (canonical_base * states_raw).sum(-1).long()
+        return indices
 
     @property
     def terminating_states(self) -> States:
@@ -135,7 +147,15 @@ class BaseGrid(Env):
         terminating_states = [element for element in terminating_states if element is not None]
         terminating_states = torch.cat(terminating_states)
         return self.States(terminating_states)
-
+    
+    def get_terminating_states_indices(self, states: States) -> BatchTensor:
+        digits = torch.arange(grid_len, device=self.device)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        terminating_states = [all_states if self.grid_dim in list else None for list in all_states]
+        terminating_states = [element for element in terminating_states if element is not None]
+        terminating_states = torch.cat(terminating_states)
+        return self.get_states_indices(terminating_states)
+'''
     @property
     def true_dist_pmf(self) -> torch.Tensor:
         true_dist = self.reward(self.terminating_states)
@@ -145,3 +165,4 @@ class BaseGrid(Env):
     def log_partition(self) -> float:
         log_rewards = self.log_reward(self.terminating_states)
         return torch.logsumexp(log_rewards, -1).item()
+        '''
