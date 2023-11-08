@@ -115,12 +115,12 @@ class BaseGrid(Env):
 
     @property
     def n_terminating_states(self) -> int:
-        digits = torch.arange(grid_len, device=self.device)
-        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
-        terminating_states = [all_states if self.grid_dim in list else None for list in all_states]
+        digits = torch.arange(grid_len)
+        all_states = torch.cartesian_prod(*[digits] * grid_dim)
+        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
         terminating_states = [element for element in terminating_states if element is not None]
-        terminating_states = torch.cat(terminating_states)
-        n_terminating_states = terminating_states.size(1)
+        terminating_states = torch.stack(terminating_states)
+        n_terminating_states = terminating_states.size(0)
         return n_terminating_states
 
     @property
@@ -141,19 +141,20 @@ class BaseGrid(Env):
 
     @property
     def terminating_states(self) -> States:
-        digits = torch.arange(grid_len, device=self.device)
-        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
-        terminating_states = [all_states if self.grid_dim in list else None for list in all_states]
+        digits = torch.arange(grid_len)
+        all_states = torch.cartesian_prod(*[digits] * grid_dim)
+        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
         terminating_states = [element for element in terminating_states if element is not None]
-        terminating_states = torch.cat(terminating_states)
+        terminating_states = torch.stack(terminating_states)
+        n_terminating_states = terminating_states.size(0)
         return self.States(terminating_states)
     
     def get_terminating_states_indices(self, states: States) -> BatchTensor:
-        digits = torch.arange(grid_len, device=self.device)
-        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
-        terminating_states = [all_states if self.grid_dim in list else None for list in all_states]
+        digits = torch.arange(grid_len)
+        all_states = torch.cartesian_prod(*[digits] * grid_dim)
+        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
         terminating_states = [element for element in terminating_states if element is not None]
-        terminating_states = torch.cat(terminating_states)
+        terminating_states = torch.stack(terminating_states)
         return self.get_states_indices(terminating_states)
 '''
     @property
