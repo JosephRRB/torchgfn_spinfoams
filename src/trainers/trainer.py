@@ -7,6 +7,17 @@ import torch
 
 from gfn import LogitPBEstimator, LogitPFEstimator, LogStateFlowEstimator
 from gfn.losses import SubTBParametrization, SubTrajectoryBalance
+
+from gfn.losses.detailed_balance import DBParametrization, DetailedBalance
+from gfn.losses.flow_matching import FlowMatching, FMParametrization
+from gfn.losses.sub_trajectory_balance import SubTBParametrization, SubTrajectoryBalance
+from gfn.losses.trajectory_balance import (
+    LogPartitionVarianceLoss,
+    PFBasedParametrization,
+    TBParametrization,
+    TrajectoryBalance,
+)
+    
 from gfn.samplers import DiscreteActionsSampler, TrajectoriesSampler, BackwardDiscreteActionsSampler
 from gfn.containers.trajectories import Trajectories
 
@@ -111,6 +122,9 @@ def train_gfn(
     elif parametrization_name == "SubTB":
         parametrization = SubTBParametrization(forward_policy, backward_policy, logF)
         loss_cls = SubTrajectoryBalance
+    elif parametrization_name == "FM":
+        parametrization = parametrization = FMParametrization(forward_policy)
+        loss_cls = FlowMatching
     else:
         raise ValueError(f"Unknown parametrization {parametrization_name}")
 
@@ -149,6 +163,8 @@ def train_gfn(
         
         if parametrization_name == "DB":
             training_objects = trajectories.to_transitions()
+        elif parametrization_name == "FM":
+            training_objects = trajectories.to_non_initial_intermediary_and_terminating_states()
         else:
             training_objects = trajectories
         
@@ -171,13 +187,21 @@ def train_gfn(
 
         optimizer.zero_grad()
         
-        
-        loss_fn = loss_cls(parametrization=parametrization,
-            log_reward_clip_min=-500.0,
-            on_policy=False,
-            **loss_params)
+        if parametrization_name == "FM":
+            loss_fn = loss_cls(parametrization=parametrization)
+        else:
+            loss_fn = loss_cls(parametrization=prametrization, **loss_params)
         
         loss = loss_fn(training_objects)
+        
+        if parametrization_name == "TB":
+        assert torch.all(
+            torch.abs(
+                loss_fn.get_pfs_and_pbs(training_objects)[0]
+                - training_objects.log_probs
+            )
+            < 1e-5
+        )
         
         loss.backward()
         
