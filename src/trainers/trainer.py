@@ -43,6 +43,7 @@ def train_gfn(
     loss_params=LOSS_PARAMS,
     replay_params=REPLAY_PARAMS, # replay_params or None
     nn_params=NN_PARAMS,
+    parametrization_name = "SubTB"
 ):
     if replay_params:
         max_fraction_offline = replay_params.pop("max_fraction_offline")
@@ -97,16 +98,22 @@ def train_gfn(
     eval_sampler = TrajectoriesSampler(
         env=env, actions_sampler=DiscreteActionsSampler(estimator=forward_policy)
     )
+    
+    if parametrization_name == "DB":
+        parametrization = DBParametrization(forward_policy, backward_policy, logF)
+        loss_cls = DetailedBalance
+    elif parametrization_name == "TB":
+        parametrization = TBParametrization(forward_policy, backward_policy, logZ)
+        loss_cls = TrajectoryBalance
+    elif parametrization_name == "ZVar":
+        parametrization = PFBasedParametrization(forward_policy, backward_policy)
+        loss_cls = LogPartitionVarianceLoss
+    elif parametrization_name == "SubTB":
+        parametrization = SubTBParametrization(forward_policy, backward_policy, logF)
+        loss_cls = SubTrajectoryBalance
+    else:
+        raise ValueError(f"Unknown parametrization {parametrization_name}")
 
-    parametrization = SubTBParametrization(forward_policy, backward_policy, logF)
-    # Don't use stored log_probs because of backward trajectories
-    # Their log_probs are for backward actions but loss uses them for forward actions
-    loss_fn = SubTrajectoryBalance(
-        parametrization=parametrization,
-        log_reward_clip_min=-500.0,
-        on_policy=False,
-        **loss_params
-    )
 
     if policy == "sa":
         params = [
@@ -139,6 +146,12 @@ def train_gfn(
 
         n_samples_online = batch_size - offline_trajectories.n_trajectories
         trajectories = forward_sampler.sample(n_trajectories=n_samples_online)
+        
+        if parametrization_name == "DB":
+            training_objects = trajectories.to_transitions()
+        else:
+            training_objects = trajectories
+        
         if replay_params:
             replay_buffer.add(trajectories)
             # Pad log_probs to avoid error when combining with forward trajectories
@@ -157,8 +170,18 @@ def train_gfn(
             trajectories.extend(offline_trajectories)
 
         optimizer.zero_grad()
-        loss = loss_fn(trajectories)
+        
+        
+        loss_fn = loss_cls(parametrization=parametrization,
+            log_reward_clip_min=-500.0,
+            on_policy=False,
+            **loss_params)
+        
+        loss = loss_fn(training_objects)
+        
         loss.backward()
+        
+        
         optimizer.step()
 
         if exploration_rate or replay_params:
