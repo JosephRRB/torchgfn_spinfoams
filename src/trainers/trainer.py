@@ -190,18 +190,18 @@ def train_gfn(
         if parametrization_name == "FM":
             loss_fn = loss_cls(parametrization=parametrization)
         else:
-            loss_fn = loss_cls(parametrization=prametrization, **loss_params)
+            loss_fn = loss_cls(parametrization=parametrization, **loss_params)
         
         loss = loss_fn(training_objects)
         
         if parametrization_name == "TB":
-        assert torch.all(
-            torch.abs(
-                loss_fn.get_pfs_and_pbs(training_objects)[0]
-                - training_objects.log_probs
+            assert torch.all(
+                torch.abs(
+                    loss_fn.get_pfs_and_pbs(training_objects)[0]
+                    - training_objects.log_probs
+                )
+                < 1e-5
             )
-            < 1e-5
-        )
         
         loss.backward()
         
