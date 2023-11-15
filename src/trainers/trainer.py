@@ -5,7 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 
-from gfn import LogitPBEstimator, LogitPFEstimator, LogStateFlowEstimator
+from gfn import LogitPBEstimator, LogitPFEstimator, LogStateFlowEstimator, LogZEstimator
 from gfn.losses import SubTBParametrization, SubTrajectoryBalance
 
 from gfn.losses.detailed_balance import DBParametrization, DetailedBalance
@@ -81,6 +81,8 @@ def train_gfn(
             torso=forward_policy.module.torso,
             forward_looking=forward_looking
         )
+        logZ = LogZEstimator(torch.tensor(0.0))
+
     elif policy == "ssr":
         forward_policy = ForwardLogRelativeEdgeFlowEstimator(
             env=env, **nn_params
@@ -93,6 +95,8 @@ def train_gfn(
             module_name="NeuralNet",
             forward_looking=forward_looking
         )
+        logZ = LogZEstimator(torch.tensor(0.0))
+
     else:
         raise NotImplementedError("Only 'sa' and 'ssr' policies are available")
 
@@ -189,8 +193,10 @@ def train_gfn(
         
         if parametrization_name == "FM":
             loss_fn = loss_cls(parametrization=parametrization)
-        else:
+        elif parametrization_name == "SubTB":
             loss_fn = loss_cls(parametrization=parametrization, **loss_params)
+        else:
+            loss_fn = loss_cls(parametrization=parametrization)
         
         loss = loss_fn(training_objects)
         

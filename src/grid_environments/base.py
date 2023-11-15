@@ -130,6 +130,26 @@ class BaseGrid(Env):
         all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
         return self.States(all_states)
     
+    @property
+    def terminating_states(self) -> States:
+        digits = torch.arange(grid_len)
+        all_states = torch.cartesian_prod(*[digits] * grid_dim)
+        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
+        terminating_states = [element for element in terminating_states if element is not None]
+        terminating_states = torch.stack(terminating_states)
+        return self.States(terminating_states)
+'''   
+    def get_states_indices(self, states: States) -> BatchTensor:
+        """The chosen encoding is the following: -1 -> 0, 0 -> 1, 1 -> 2, then we convert to base 3"""
+        states_raw = states.states_tensor
+        canonical_base = 3 ** torch.arange(self.ndim - 1, -1, -1, device=self.device)
+        return (states_raw + 1).mul(canonical_base).sum(-1).long()
+
+    def get_terminating_states_indices(self, states: States) -> BatchTensor:
+        states_raw = states.states_tensor
+        canonical_base = 2 ** torch.arange(self.ndim - 1, -1, -1, device=self.device)
+        return (states_raw).mul(canonical_base).sum(-1).long()
+      
     def get_states_indices(self, states: States) -> BatchTensor:
         states_raw = states.states_tensor
 
@@ -138,16 +158,16 @@ class BaseGrid(Env):
         )
         indices = (canonical_base * states_raw).sum(-1).long()
         return indices
-
-    @property
-    def terminating_states(self) -> States:
+    
+    #TODO: Instead of returning terminating states indices for the whole grid do it only for the terminating states in states argument ie:
+    def get_terminating_states_indices(self, states: States) -> BatchTensor:
         digits = torch.arange(grid_len)
-        all_states = torch.cartesian_prod(*[digits] * grid_dim)
-        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
+        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in states]
         terminating_states = [element for element in terminating_states if element is not None]
         terminating_states = torch.stack(terminating_states)
-        n_terminating_states = terminating_states.size(0)
-        return self.States(terminating_states)
+        return self.get_states_indices(terminating_states)
+    
+
     
     def get_terminating_states_indices(self, states: States) -> BatchTensor:
         digits = torch.arange(grid_len)
@@ -156,6 +176,8 @@ class BaseGrid(Env):
         terminating_states = [element for element in terminating_states if element is not None]
         terminating_states = torch.stack(terminating_states)
         return self.get_states_indices(terminating_states)
+'''
+
 '''
     @property
     def true_dist_pmf(self) -> torch.Tensor:
