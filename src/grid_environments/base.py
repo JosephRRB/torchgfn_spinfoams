@@ -10,6 +10,8 @@ from gfn.envs.preprocessors import KHotPreprocessor
 from gfn.envs.env import Env
 from gfn.containers.states import States
 
+import random
+
 
 # Typing
 TensorLong = TensorType["batch_shape", torch.long]
@@ -40,6 +42,8 @@ class BaseGrid(Env):
             self.grid_dim, dtype=torch.long, device=self.device
         )
         
+        #s0 = torch.randint(self.grid_len, (self.grid_dim,))
+        
         sf = torch.full(
             (self.grid_dim,), fill_value=-1, dtype=torch.long, device=self.device
         )
@@ -65,6 +69,11 @@ class BaseGrid(Env):
             state_shape: ClassVar[tuple[int, ...]] = (env.grid_dim,)
             s0 = env.s0
             sf = env.sf
+            
+            #@classmethod
+            #def make_random_states_tensor(cls, batch_shape: tuple[int]) -> StatesTensor:
+            #    assert cls.s0 is not None and state_ndim is not None
+            #    return cls.s0.repeat(*batch_shape, * random.sample(range(self.grid_len), self.grid_dim) )
 
             def make_masks(self) -> Tuple[ForwardMasksTensor, BackwardMasksTensor]:
                 "Mask illegal (forward and backward) actions."
@@ -94,6 +103,7 @@ class BaseGrid(Env):
 
     def is_exit_actions(self, actions: TensorLong) -> TensorBool:
         return actions == self.action_space.n - 1
+#        return torch.ones(actions.size(dim=0), dtype = torch.bool)
 
     def maskless_step(self, states: StatesTensor, actions: TensorLong) -> None:
         states.scatter_(-1, actions.unsqueeze(-1), 1, reduce="add")
@@ -114,30 +124,48 @@ class BaseGrid(Env):
         return self.grif_len**self.grid_dim
 
     @property
+    def all_states(self) -> States:
+        # This is brute force !
+        digits = torch.arange(self.grid_len, device=self.device)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        return self.States(all_states)
+    
+   
+    @property
     def n_terminating_states(self) -> int:
-        digits = torch.arange(grid_len)
-        all_states = torch.cartesian_prod(*[digits] * grid_dim)
-        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
+        digits = torch.arange(self.grid_len)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        terminating_states = [list if (self.grid_dim in list or 0 in list) else None for list in all_states]
         terminating_states = [element for element in terminating_states if element is not None]
         terminating_states = torch.stack(terminating_states)
         n_terminating_states = terminating_states.size(0)
         return n_terminating_states
-
-    @property
-    def all_states(self) -> States:
-        # This is brute force !
-        digits = torch.arange(grid_len, device=self.device)
-        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
-        return self.States(all_states)
     
     @property
     def terminating_states(self) -> States:
-        digits = torch.arange(grid_len)
-        all_states = torch.cartesian_prod(*[digits] * grid_dim)
-        terminating_states = [list if (grid_dim in list or 0 in list) else None for list in all_states]
+        digits = torch.arange(self.grid_len)
+        all_states = torch.cartesian_prod(*[digits] * self.grid_dim)
+        terminating_states = [list if (self.grid_dim in list or 0 in list) else None for list in all_states]
         terminating_states = [element for element in terminating_states if element is not None]
         terminating_states = torch.stack(terminating_states)
-        return self.States(terminating_states)
+        return self.States(terminating_states) 
+
+    
+'''    
+    @property
+    def n_terminating_states(self) -> int:
+        terminating_states = torch.full(self.grid_dim, self.grid_len)
+        n_terminating_states = terminating_states.size(0)
+        return n_terminating_states
+    
+    @property
+    def terminating_states(self) -> States:
+        terminating_states = torch.full(self.grid_dim, self.grid_len)
+        return terminating_states
+
+  
+'''
+ 
 '''   
     def get_states_indices(self, states: States) -> BatchTensor:
         """The chosen encoding is the following: -1 -> 0, 0 -> 1, 1 -> 2, then we convert to base 3"""

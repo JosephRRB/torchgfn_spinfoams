@@ -5,7 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 
-from gfn import LogitPBEstimator, LogitPFEstimator, LogStateFlowEstimator, LogZEstimator
+from gfn import LogitPBEstimator, LogitPFEstimator, LogStateFlowEstimator, LogZEstimator, LogEdgeFlowEstimator
 from gfn.losses import SubTBParametrization, SubTrajectoryBalance
 
 from gfn.losses.detailed_balance import DBParametrization, DetailedBalance
@@ -75,13 +75,6 @@ def train_gfn(
             module_name="NeuralNet",
             torso=forward_policy.module.torso,
         )
-        logF = LogStateFlowEstimator(
-            env=env,
-            module_name="NeuralNet",
-            torso=forward_policy.module.torso,
-            forward_looking=forward_looking
-        )
-        logZ = LogZEstimator(torch.tensor(0.0))
 
     elif policy == "ssr":
         forward_policy = ForwardLogRelativeEdgeFlowEstimator(
@@ -90,29 +83,19 @@ def train_gfn(
         backward_policy = BackwardLogRelativeEdgeFlowEstimator(
             env=env, **nn_params
         )
-        logF = LogStateFlowEstimator(
-            env=env,
-            module_name="NeuralNet",
-            forward_looking=forward_looking
-        )
-        logZ = LogZEstimator(torch.tensor(0.0))
-
     else:
         raise NotImplementedError("Only 'sa' and 'ssr' policies are available")
-
-    forward_sampler = TrajectoriesSampler(
+        
+        
+    logF = LogStateFlowEstimator(
         env=env,
-        actions_sampler=DiscreteActionsSampler(
-            estimator=forward_policy,
-            epsilon=exploration_rate
-        )
+        module_name="NeuralNet",
+        torso=forward_policy.module.torso,
+        forward_looking=forward_looking
     )
-    backward_sampler = TrajectoriesSampler(
-        env=env, actions_sampler=BackwardDiscreteActionsSampler(estimator=backward_policy,)
-    )
-    eval_sampler = TrajectoriesSampler(
-        env=env, actions_sampler=DiscreteActionsSampler(estimator=forward_policy)
-    )
+    logZ = LogZEstimator(torch.tensor(0.0))
+    
+    logF_edge = LogEdgeFlowEstimator(env=env, module_name="NeuralNet", torso=forward_policy.module.torso)
     
     if parametrization_name == "DB":
         parametrization = DBParametrization(forward_policy, backward_policy, logF)
@@ -127,11 +110,40 @@ def train_gfn(
         parametrization = SubTBParametrization(forward_policy, backward_policy, logF)
         loss_cls = SubTrajectoryBalance
     elif parametrization_name == "FM":
-        parametrization = parametrization = FMParametrization(forward_policy)
+        parametrization = FMParametrization(logF_edge)
         loss_cls = FlowMatching
     else:
         raise ValueError(f"Unknown parametrization {parametrization_name}")
 
+    if parametrization_name == "FM":
+        forward_sampler = TrajectoriesSampler(
+            env=env,
+            actions_sampler=DiscreteActionsSampler(
+                estimator=logF_edge,
+                epsilon=exploration_rate
+            )
+        )
+        backward_sampler = TrajectoriesSampler(
+            env=env, actions_sampler=BackwardDiscreteActionsSampler(estimator=logF_edge,)
+        )
+        eval_sampler = TrajectoriesSampler(
+            env=env, actions_sampler=DiscreteActionsSampler(estimator=logF_edge)
+        )
+    else:
+        forward_sampler = TrajectoriesSampler(
+            env=env,
+            actions_sampler=DiscreteActionsSampler(
+                estimator=forward_policy,
+                epsilon=exploration_rate
+            )
+        )
+        backward_sampler = TrajectoriesSampler(
+            env=env, actions_sampler=BackwardDiscreteActionsSampler(estimator=backward_policy,)
+        )
+        eval_sampler = TrajectoriesSampler(
+            env=env, actions_sampler=DiscreteActionsSampler(estimator=forward_policy)
+        )
+        
 
     if policy == "sa":
         params = [
@@ -163,8 +175,13 @@ def train_gfn(
 
 
         n_samples_online = batch_size - offline_trajectories.n_trajectories
-        trajectories = forward_sampler.sample(n_trajectories=n_samples_online)
         
+        if parametrization_name == "FM":
+            trajectories = forward_sampler.sample_trajectories(n_trajectories=n_samples_online)
+        else:
+            trajectories = forward_sampler.sample(n_trajectories=n_samples_online)
+            
+            
         if parametrization_name == "DB":
             training_objects = trajectories.to_transitions()
         elif parametrization_name == "FM":
@@ -219,17 +236,33 @@ def train_gfn(
                 n_trajectories=batch_size
             )
             states = eval_trajectories.last_states.states_tensor.cpu().numpy()
+            #states = eval_trajectories().states_tensor.cpu().numpy()
         else:
             states = trajectories.last_states.states_tensor.cpu().numpy()
-
+            #states = trajectories.to_states().states_tensor.cpu().numpy()
+       
         terminal_states.append(states)
 
         losses.append(loss.item())
 
     terminal_states = np.stack(terminal_states)
-
-    os.makedirs(generated_data_dir, exist_ok=True)
-    np.save(
+    
+    if parametrization_name == "SubTB":
+        if 'lamda' not in loss_params:
+            os.makedirs(f"{generated_data_dir}_{loss_params['weighing']}/", exist_ok=True)
+            np.save(
+            f"{generated_data_dir}_{loss_params['weighing']}/terminal_states.npy",
+            terminal_states
+            )
+        else:
+            os.makedirs(f"{generated_data_dir}_{loss_params['weighing']}_{loss_params['lamda']}/", exist_ok=True)
+            np.save(
+            f"{generated_data_dir}_{loss_params['weighing']}_{loss_params['lamda']}/terminal_states.npy",
+            terminal_states
+            )
+    else:
+        os.makedirs(generated_data_dir, exist_ok=True)
+        np.save(
         f"{generated_data_dir}/terminal_states.npy",
         terminal_states
     )
