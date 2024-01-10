@@ -155,11 +155,11 @@ def get_distributions_over_time_flattened(grid_len, distributions_over_time, ite
 def case_parameters(str):
     lst = str.split("_")
     if lst[0] == "SubTB" and len(lst) == 3: #no lamda
-        return f"parametrization_name = {lst[0]}, exploration_rate = {lst[1]}, weighing = {lst[2]}"
+        return f"parametrization name = {lst[0]}, exploration_rate = {lst[1]}, weighing = {lst[2]}"
     elif lst[0] == "SubTB" and len(lst) > 3: #with lamda
-        return f"parametrization_name = {lst[0]}, exploration_rate = {lst[1]}, weighing = {lst[2]}, lamda = {lst[3]}"
+        return f"parametrization name = {lst[0]}, exploration rate = {lst[1]}, weighing = {lst[2]}, lamda = {lst[3]}"
     else: #not SubTB
-        return f"parametrization_name = {lst[0]}, exploration_rate = {lst[1]}"
+        return f"parametrization name = {lst[0]}, exploration rate = {lst[1]}"
 
 window_size = int(n_iterations / 10) if int(n_iterations / 10) > 0 else 1
 
@@ -184,126 +184,104 @@ _, mcmc_distributions_over_time_flattened = get_distributions_over_time_flattene
     grid_len, mcmc_distributions_over_time
 )
 
-print("Finisehd MC")
 
 # Load GFN states
 thedir=f"{ROOT_DIR}/thanos_data/GFN/single vertex spinfoam/j={float(spin_j)}/"
 
-parametrization = [parametrization for parametrization in next(os.walk(thedir))[1]]
-
-print("Finished parametrs")
-
-gfn_states = [np.load(thedir+parametrization+"/terminal_states.npy") for parametrization in next(os.walk(thedir))[1] ]
-
-print("Fisnished states")
-
-gfn_distributions_over_time = [None] * len(gfn_states)
-gfn_n_t = [None] * len(gfn_states)
-
-for i in range(len(gfn_states)):
-    gfn_distributions_over_time[i], gfn_n_t[i] = get_distributions_over_time(
-        gfn_states[i], grid_len, every_n_iterations=every_n_iterations
+for parametrization in next(os.walk(thedir))[1]:
+    
+    #Parameters for the figures' title
+    parameters = case_parameters(parametrization)
+    
+    gfn_states = np.load(thedir+parametrization+"/terminal_states.npy")
+    
+    gfn_distributions_over_time, gfn_n_t = get_distributions_over_time(
+        gfn_states, grid_len, every_n_iterations=every_n_iterations
     )
 
-gfn_distributions_over_time_window = [None] * len(gfn_states)
-gfn_iterations = [None] * len(gfn_states)
-
-for i in range(len(gfn_states)):
-    gfn_distributions_over_time_window[i], gfn_iterations[i] = get_distributions_over_time_window(
-        gfn_states[i], grid_len, window_size=window_size, every_n_iterations=every_n_iterations
+    gfn_distributions_over_time_window, gfn_iterations = get_distributions_over_time_window(
+        gfn_states, grid_len, window_size=window_size, every_n_iterations=every_n_iterations
     )
     
-grid_coordinates_list = [None] * len(gfn_states)
-gfn_distributions_over_time_flattened = [None] * len(gfn_states)
+    print("Finished loading states!")
 
-for i in range(len(gfn_states)):
-    grid_coordinates_list[i], gfn_distributions_over_time_flattened[i] = get_distributions_over_time_flattened(
-        grid_len, gfn_distributions_over_time[i]
-    )
-    
-print("Finished loading states!")
-
-    
-# Plots with windows
-for i in range(len(gfn_states)):
-    
-    parameters = case_parameters(parametrization[i])
+    # Plots with windows
 
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 8))
 
-    fig.suptitle(f"j={spin_j}, window size={window_size} " + parameters)
-
+    fig.suptitle(f"j={spin_j}, " + parameters)
+    
     plot_l1_errors_window(
-        gfn_distributions_over_time_window[i], grid_rewards, gfn_iterations[i], ax[0], "gfn"
+        gfn_distributions_over_time_window, grid_rewards, gfn_iterations, ax[0], "gfn"
     )
+    
     plot_l1_errors_window(
         mcmc_distributions_over_time_window, grid_rewards, mcmc_iterations, ax[0], "mcmc"
     )
-    
+
     plot_observable_expectation_values_window(
-        gfn_distributions_over_time_window[i], gfn_iterations[i], spin_j, ax[1], "gfn"
+        gfn_distributions_over_time_window, gfn_iterations, spin_j, ax[1], "gfn"
     )
+    
     plot_observable_expectation_values_window(
         mcmc_distributions_over_time_window, mcmc_iterations, spin_j, ax[1], "mcmc"
     )
+
+    plt.tight_layout()
     
-    # plot_log_empirical_vs_log_expected(
-    #     gfn_distributions_over_time_window[-1], grid_rewards, ax[2], "gfn"
-    # )
-    
-    plt.savefig(thedir+parametrization[i]+"/Loss_Cos_Window.png", bbox_inches='tight')
+    plt.savefig(thedir+parametrization+"/Loss_Cos_Window.png", bbox_inches='tight')
     
     plt.close()
     
-print("Finished plots with windows!")
-    
-# Plots all of the results
-for i in range(len(gfn_states)):
-
-    parameters = case_parameters(parametrization[i])
+    print("Finished plots with windows!")
 
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 8))
 
-    fig.suptitle(f"j={spin_j}" + parameters)
-
-
+    fig.suptitle(f"j={spin_j}, " + parameters)
+    
     plot_l1_errors(
-        gfn_distributions_over_time[i], grid_rewards, gfn_n_t[i], ax[0], "gfn"
+        gfn_distributions_over_time, grid_rewards, gfn_n_t, ax[0], "gfn"
     )
     plot_l1_errors(
         mcmc_distributions_over_time, grid_rewards, mcmc_n_t, ax[0], "mcmc"
     )
-    
+
     plot_observable_expectation_values(
-        gfn_distributions_over_time[i], gfn_n_t[i], spin_j, ax[1], "gfn"
+        gfn_distributions_over_time, gfn_n_t, spin_j, ax[1], "gfn"
     )
     plot_observable_expectation_values(
         mcmc_distributions_over_time, mcmc_n_t, spin_j, ax[1], "mcmc"
     )
 
-# plot_log_empirical_vs_log_expected(
-#     gfn_distributions_over_time[-1], grid_rewards, ax[2], "gfn"
-# )
-    plt.savefig(thedir+parametrization[i]+"/Loss_Cos.png", bbox_inches='tight')
+    plt.tight_layout()
+
+    plt.savefig(thedir+parametrization+"/Loss_Cos.png", bbox_inches='tight')
     
     plt.close()
 
     
-print("Finished plots! >.<")
+    print("Finished plots! >.<")
 
-# Plot the states with respect to the Euclidean distance
-# Create a 2D array of the grid coordinates and the respective rewards, flattened.
-for i in range(len(gfn_states)):
+    # Plot the states with respect to the Euclidean distance
+    # Create a 2D array of the grid coordinates and the respective rewards, flattened.
+    grid_coordinates_list, gfn_distributions_over_time_flattened = get_distributions_over_time_flattened(
+        grid_len, gfn_distributions_over_time
+    )
+
+    grid_coordinates_list, mcmc_distributions_over_time_flattened = get_distributions_over_time_flattened(
+        grid_len, mcmc_distributions_over_time
+    )
+
     _, theoretical_distributions_over_time_flattened = get_distributions_over_time_flattened(
         grid_len, grid_rewards
     )
 
     df = pd.DataFrame(
         {
-            "Coordinates": grid_coordinates_list[i],
+            "Coordinates": grid_coordinates_list,
             "Theoretical": theoretical_distributions_over_time_flattened,
             "MCMC": mcmc_distributions_over_time_flattened,
-            "GFN": gfn_distributions_over_time_flattened[i]
+            "GFN": gfn_distributions_over_time_flattened
          }
     )
 
@@ -314,9 +292,7 @@ for i in range(len(gfn_states)):
     sns.set_style("darkgrid")
     fig = plt.figure(figsize=(20, 12))
     
-    parameters = case_parameters(parametrization[i])
-
-    fig.suptitle(f"j={spin_j}" + parameters)    
+    fig.suptitle(f"j={spin_j}, " + parameters)    
     
     gs = fig.add_gridspec(2, 3)
     ax1 = fig.add_subplot(gs[0, 0])
@@ -337,8 +313,9 @@ for i in range(len(gfn_states)):
     sns.scatterplot(x=df["distance"], y=df["MCMC"], label="MCMC", s=s, alpha=alpha, ax=ax4, color="orange")
     sns.scatterplot(x=df["distance"], y=df["GFN"], label="GFN", s=s, alpha=alpha, ax=ax4, color="green")
     
-    plt.savefig(thedir+parametrization[i]+"/Euclidean_Distance.png", bbox_inches='tight')
+    plt.savefig(thedir+parametrization+"/Euclidean_Distance.png", bbox_inches='tight')
     
     plt.close()
     
-print("Finished Euclidean plots!")
+    print("Finished Euclidean plots!")
+    print(f"Done with {parametrization}.")
