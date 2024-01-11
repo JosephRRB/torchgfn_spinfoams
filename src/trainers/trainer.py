@@ -249,21 +249,21 @@ def train_gfn(
     
     if parametrization_name == "SubTB":
         if 'lamda' not in loss_params:
-            os.makedirs(f"{generated_data_dir}_{loss_params['weighing']}/", exist_ok=True)
+            os.makedirs(f"{generated_data_dir}_{exploration_rate}_{loss_params['weighing'].replace('_','-')}/", exist_ok=True)
             np.save(
-            f"{generated_data_dir}_{loss_params['weighing']}/terminal_states.npy",
+            f"{generated_data_dir}_{exploration_rate}_{loss_params['weighing'].replace('_','-')}/terminal_states.npy",
             terminal_states
             )
         else:
-            os.makedirs(f"{generated_data_dir}_{loss_params['weighing']}_{loss_params['lamda']}/", exist_ok=True)
+            os.makedirs(f"{generated_data_dir}_{exploration_rate}_{loss_params['weighing'].replace('_','-')}_{loss_params['lamda']}/", exist_ok=True)
             np.save(
-            f"{generated_data_dir}_{loss_params['weighing']}_{loss_params['lamda']}/terminal_states.npy",
+            f"{generated_data_dir}_{exploration_rate}_{loss_params['weighing'].replace('_','-')}_{loss_params['lamda']}/terminal_states.npy",
             terminal_states
             )
     else:
-        os.makedirs(generated_data_dir, exist_ok=True)
+        os.makedirs(f"{generated_data_dir}_{exploration_rate}", exist_ok=True)
         np.save(
-        f"{generated_data_dir}/terminal_states.npy",
+        f"{generated_data_dir}_{exploration_rate}/terminal_states.npy",
         terminal_states
     )
     if replay_buffer:
