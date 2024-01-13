@@ -3,7 +3,7 @@
 #SBATCH --job-name=SubTB
 #SBATCH -p defq
 #SBATCH --time=24:00:00
-#SBATCH --array=0-3
+#SBATCH --array=0-2
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 

@@ -13,7 +13,7 @@ spin_j = 6
 
 env_name = f"single vertex spinfoam/j={float(spin_j)}"
 batch_size = 16
-n_iterations = int(1e5)
+n_iterations = int(1e2)
 
 vertex = np.load(f"{ROOT_DIR}/data/EPRL_vertices/Python/Dl_20/vertex_j_{float(spin_j)}.npz")
 sq_ampl = vertex**2
@@ -55,44 +55,48 @@ device_str = "cpu" # cpu or cuda (torchgfn has some issues with gpu)
 
 
 parametrization_name = "SubTB"
-weighings = ["DB", "ModifiedDB", "equal", "equal_within"] # "TB" and "geometric" do not work
+weighing = "geometric_within" # "TB" and "geometric" do not work
 
 parser = argparse.ArgumentParser()
+
+lamdas = [0.1, 0.9, 3]
 
 parser.add_argument("-p", "--position", help="use job number from slurm in python script for getting elements out of lists", type=int)
 
 args = parser.parse_args()
 
-weighing = weighings[args.position]
+lamda = lamdas[args.position]
 
 for exploration_rate in [0.01, 0.1, 0.9]:
-    loss_params = {
-        "weighing": weighing,
-        }
-    generated_data_dir = f"{ROOT_DIR}/thanos_data/GFN/{env_name}/{parametrization_name}"
-    if os.path.isfile(f"{generated_data_dir}_{exploration_rate}_{loss_params['weighing'].replace('_','-')}/terminal_states.npy"):
-        continue
-    else:
-        start_time = time.time()
-                    
-        terminal_states, _ = train_gfn(
-            env=BaseGrid(grid_rewards=grid_rewards, device_str=device_str),
-            generated_data_dir=f"{ROOT_DIR}/thanos_data/GFN/{env_name}/{parametrization_name}", # need better way to label folders
-            batch_size=batch_size,
-            n_iterations=n_iterations,
-            learning_rate=0.001,
-            exploration_rate=exploration_rate, # (faster if set to 0)
-            policy="sa",
-            forward_looking=False,
-            loss_params=loss_params,
-            replay_params=None, # replay_params or None (faster if None)
-            nn_params=nn_params,
-            parametrization_name = parametrization_name
-        )
-        f = open("times", "a")
-        f.write(f"\n{parametrization_name}, exploration rate {exploration_rate}, weighing {weighing} = {time.time()-start_time}")
-        f.close()
+    if weighing == "geometric_within" or weighing == "geometric":
+            loss_params = {
+                    "weighing": weighing,
+                    "lamda": lamda,
+                }
+            generated_data_dir = f"{ROOT_DIR}/thanos_data/GFN/{env_name}/{parametrization_name}"
+            if os.path.isfile(f"{generated_data_dir}_{exploration_rate}_{loss_params['weighing'].replace('_','-')}_{loss_params['lamda']}/terminal_states.npy"):
+                continue
+            else:
+                start_time = time.time()
 
+                terminal_states, _ = train_gfn(
+                env=BaseGrid(grid_rewards=grid_rewards, device_str=device_str),
+                generated_data_dir=f"{ROOT_DIR}/thanos_data/GFN/{env_name}/{parametrization_name}", # need better way to label folders
+                batch_size=batch_size,
+                n_iterations=n_iterations,
+                learning_rate=0.001,
+                exploration_rate=exploration_rate, # (faster if set to 0)
+                policy="sa",
+                forward_looking=False,
+                loss_params=loss_params,
+                replay_params=None, # replay_params or None (faster if None)
+                nn_params=nn_params,
+                parametrization_name = parametrization_name
+                )
+
+                f = open("times", "a")
+                f.write(f"\n{parametrization_name}, exploration rate {exploration_rate}, weighing {weighing}, lamda {loss_params['lamda']} = {time.time()-start_time}")
+                f.close()
 
     
 '''
