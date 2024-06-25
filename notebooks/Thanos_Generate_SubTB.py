@@ -20,12 +20,20 @@ sq_ampl = vertex**2
 grid_rewards = sq_ampl / np.sum(sq_ampl)
 
 
-from src.MCMC.batched_mcmc import MCMCRunner
+if not os.path.exists(f"{ROOT_DIR}/thanos_data/MCMC"):
+    from src.MCMC.batched_mcmc import MCMCRunner
+    
+    start_time = time.time()
+    
+    mcmc = MCMCRunner(grid_rewards=grid_rewards)
+    mcmc_chains, _ = mcmc.run_mcmc_chains(
+        batch_size=batch_size, n_iterations=n_iterations, generated_data_dir=f"{ROOT_DIR}/thanos_data/MCMC/{env_name}"
+    )
+    
+    f = open("times", "a")
+    f.write(f"\nMCMC, , , , {(time.time()-start_time):.2f}")
+    f.close()
 
-mcmc = MCMCRunner(grid_rewards=grid_rewards)
-mcmc_chains, _ = mcmc.run_mcmc_chains(
-    batch_size=batch_size, n_iterations=n_iterations, generated_data_dir=f"{ROOT_DIR}/thanos_data/MCMC/{env_name}"
-)
 
 
 from src.grid_environments.base import BaseGrid
@@ -90,7 +98,7 @@ for exploration_rate in [0.01, 0.1, 0.9]:
             parametrization_name = parametrization_name
         )
         f = open("times", "a")
-        f.write(f"\n{parametrization_name}, exploration rate {exploration_rate}, weighing {weighing} = {time.time()-start_time}")
+        f.write(f"\n{parametrization_name}, {exploration_rate}, {weighing}, , {(time.time()-start_time):.2f}")
         f.close()
 
 

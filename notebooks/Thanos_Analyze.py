@@ -2,6 +2,7 @@
 import numpy as np
 import os
 import sys
+from tqdm import tqdm
 
 
 ROOT_DIR = os.path.abspath("__file__" + "/../../")
@@ -33,7 +34,7 @@ def plot_observable_expectation_values(
 
     ax.scatter(n_samples_used, mean_cos_angles, label=label)
     ax.hlines(-0.33333, n_samples_used[0], n_samples_used[-1], colors='k', linestyles='dashed')
-    ax.set_xlabel("n_samples in distribution")
+    ax.set_xlabel("Number of samples in distribution")
     ax.set_ylabel(r"<cos $\theta$>")
     #ax.set_ylim(-0.5, -0.1)
     ax.legend()
@@ -64,7 +65,7 @@ def plot_l1_errors(
     grid_axes = empirical_distributions_over_time.ndim
     ave_error_over_time = np.mean(l1_errors, axis=tuple(range(1, grid_axes)))
     ax.scatter(n_samples_used, ave_error_over_time, label=label)
-    ax.set_xlabel("n_samples in distribution")
+    ax.set_xlabel("Number of samples in distribution")
     ax.set_ylabel(r"Average Distribution Error")
     ax.legend()
     
@@ -155,11 +156,11 @@ def get_distributions_over_time_flattened(grid_len, distributions_over_time, ite
 def case_parameters(str):
     lst = str.split("_")
     if lst[0] == "SubTB" and len(lst) == 3: #no lamda
-        return f"parametrization name = {lst[0]}, exploration_rate = {lst[1]}, weighing = {lst[2]}"
+        return f"Parametrization = {lst[0]}, Exploration Rate = {lst[1]}, Weighing = {lst[2]}"
     elif lst[0] == "SubTB" and len(lst) > 3: #with lamda
-        return f"parametrization name = {lst[0]}, exploration rate = {lst[1]}, weighing = {lst[2]}, lamda = {lst[3]}"
+        return f"Parametrization = {lst[0]}, Exploration Rate = {lst[1]}, Weighing = {lst[2]}, λ = {lst[3]}"
     else: #not SubTB
-        return f"parametrization name = {lst[0]}, exploration rate = {lst[1]}"
+        return f"Parametrization = {lst[0]}, Exploration Rate = {lst[1]}"
 
 window_size = int(n_iterations / 10) if int(n_iterations / 10) > 0 else 1
 
@@ -188,10 +189,17 @@ _, mcmc_distributions_over_time_flattened = get_distributions_over_time_flattene
 # Load GFN states
 thedir=f"{ROOT_DIR}/thanos_data/GFN/single vertex spinfoam/j={float(spin_j)}/"
 
-for parametrization in next(os.walk(thedir))[1]:
+for parametrization in tqdm(next(os.walk(thedir))[1]):
+    
+    print(f"Parametrization is: {parametrization}")
+    
+    if parametrization == "Figures":
+        continue
     
     #Parameters for the figures' title
     parameters = case_parameters(parametrization)
+    
+    print(f"{parameters}")
     
     gfn_states = np.load(thedir+parametrization+"/terminal_states.npy")
     
@@ -203,7 +211,7 @@ for parametrization in next(os.walk(thedir))[1]:
         gfn_states, grid_len, window_size=window_size, every_n_iterations=every_n_iterations
     )
     
-    print("Finished loading states!")
+    print("\tFinished loading states!")
 
     # Plots with windows
 
@@ -212,19 +220,19 @@ for parametrization in next(os.walk(thedir))[1]:
     fig.suptitle(f"j={spin_j}, " + parameters)
     
     plot_l1_errors_window(
-        gfn_distributions_over_time_window, grid_rewards, gfn_iterations, ax[0], "gfn"
+        gfn_distributions_over_time_window, grid_rewards, gfn_iterations, ax[0], "GFN"
     )
     
     plot_l1_errors_window(
-        mcmc_distributions_over_time_window, grid_rewards, mcmc_iterations, ax[0], "mcmc"
+        mcmc_distributions_over_time_window, grid_rewards, mcmc_iterations, ax[0], "MCMC"
     )
 
     plot_observable_expectation_values_window(
-        gfn_distributions_over_time_window, gfn_iterations, spin_j, ax[1], "gfn"
+        gfn_distributions_over_time_window, gfn_iterations, spin_j, ax[1], "GFN"
     )
     
     plot_observable_expectation_values_window(
-        mcmc_distributions_over_time_window, mcmc_iterations, spin_j, ax[1], "mcmc"
+        mcmc_distributions_over_time_window, mcmc_iterations, spin_j, ax[1], "MCMC"
     )
 
     plt.tight_layout()
@@ -233,24 +241,24 @@ for parametrization in next(os.walk(thedir))[1]:
     
     plt.close()
     
-    print("Finished plots with windows!")
+    print("\tFinished plots with windows!")
 
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(8, 8))
 
     fig.suptitle(f"j={spin_j}, " + parameters)
     
     plot_l1_errors(
-        gfn_distributions_over_time, grid_rewards, gfn_n_t, ax[0], "gfn"
+        gfn_distributions_over_time, grid_rewards, gfn_n_t, ax[0], "GFN"
     )
     plot_l1_errors(
-        mcmc_distributions_over_time, grid_rewards, mcmc_n_t, ax[0], "mcmc"
+        mcmc_distributions_over_time, grid_rewards, mcmc_n_t, ax[0], "MCMC"
     )
 
     plot_observable_expectation_values(
-        gfn_distributions_over_time, gfn_n_t, spin_j, ax[1], "gfn"
+        gfn_distributions_over_time, gfn_n_t, spin_j, ax[1], "GFN"
     )
     plot_observable_expectation_values(
-        mcmc_distributions_over_time, mcmc_n_t, spin_j, ax[1], "mcmc"
+        mcmc_distributions_over_time, mcmc_n_t, spin_j, ax[1], "MCMC"
     )
 
     plt.tight_layout()
@@ -260,7 +268,7 @@ for parametrization in next(os.walk(thedir))[1]:
     plt.close()
 
     
-    print("Finished plots! >.<")
+    print("\tFinished plots! >.<")
 
     # Plot the states with respect to the Euclidean distance
     # Create a 2D array of the grid coordinates and the respective rewards, flattened.
@@ -306,16 +314,16 @@ for parametrization in next(os.walk(thedir))[1]:
     ax4.set_yscale("log")
 
     sns.scatterplot(x=df["distance"], y=df[df.Theoretical > 10**(-6)].Theoretical, label="Theoretical", s=s, alpha=alpha, ax=ax1, color="blue")
-    sns.scatterplot(x=df["distance"], y=df["MCMC"], label="MCMC", s=s, alpha=alpha, ax=ax2, color="orange")
+    sns.scatterplot(x=df["distance"], y=df["MCMC"], label="MCMC", s=s, alpha=alpha, ax=ax2, color="red")
     sns.scatterplot(x=df["distance"], y=df["GFN"], label="GFN", s=s, alpha=alpha, ax=ax3, color="green")
     
     sns.scatterplot(x=df["distance"], y=df[df.Theoretical > 10**(-6)].Theoretical, label="Theoretical", s=s, alpha=alpha, ax=ax4, color="blue")
-    sns.scatterplot(x=df["distance"], y=df["MCMC"], label="MCMC", s=s, alpha=alpha, ax=ax4, color="orange")
+    sns.scatterplot(x=df["distance"], y=df["MCMC"], label="MCMC", s=s, alpha=alpha, ax=ax4, color="red")
     sns.scatterplot(x=df["distance"], y=df["GFN"], label="GFN", s=s, alpha=alpha, ax=ax4, color="green")
     
     plt.savefig(thedir+parametrization+"/Euclidean_Distance.png", bbox_inches='tight')
     
     plt.close()
     
-    print("Finished Euclidean plots!")
+    print("\tFinished Euclidean plots!")
     print(f"Done with {parametrization}.")

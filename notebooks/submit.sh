@@ -3,7 +3,7 @@
 #SBATCH --job-name=all_parametrizations
 #SBATCH -p defq
 #SBATCH --time=24:00:00
-#SBATCH --array=0-4
+#SBATCH --array=0-3
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 
