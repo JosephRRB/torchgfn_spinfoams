@@ -11,4 +11,4 @@
 cd ~/Projects/torchgfn_spinfoams/
 source gfn_spinfoams/bin/activate
 cd notebooks/
-python Thanos_Generate_SubTB_Geometric.py -p $SLURM_ARRAY_TASK_ID
+python Generate\ SubTB\ Geometric.py -p $SLURM_ARRAY_TASK_ID
